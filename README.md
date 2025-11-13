@@ -39,7 +39,7 @@ Each agent:
 
 -   Receives a *single* input file (or none)
 -   Produces a *single* required output file
--   Is called by a simple `opencode run --file X --prompt "..."`
+-   Is called by a simple `opencode run "..."`
 -   Uses MCP tools to write output files internally
 
 ## 🧠 Example Agent: Planner
