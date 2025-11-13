@@ -161,4 +161,6 @@ PRs and issues welcome!
 
 ## 📄 License
 
-MIT --- enjoy your chai.
+MIT
+
+## 🫖 Enjoy your shai!
