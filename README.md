@@ -1,6 +1,8 @@
 # 🫖 **SHAI - Shell AI Agents**
 
-<img width="640" height="640" alt="image" src="https://github.com/user-attachments/assets/edd5f668-f095-465b-90f3-1c5287d86a5c" />
+<div align="center">
+  <img width="640" height="640" alt="image" src="https://github.com/user-attachments/assets/edd5f668-f095-465b-90f3-1c5287d86a5c" />
+</div>
 
 ## Lightweight agent orchestration using plain shell scripts
 
