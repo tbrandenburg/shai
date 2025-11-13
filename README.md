@@ -25,6 +25,19 @@ transparent and reproducible.
 - 🪢 **Pipeable workflows**---think Unix pipelines, but with agents
 - 💬 Works with any LLM CLI
 
+## ✨ Why This Project Matters
+
+Running agents with shell scripts unlocks powerful capabilities:
+
+- **🔄 Reusable bash scripts** – Write once, run anywhere: locally, in CI/CD pipelines, or scheduled workflows
+- **🏗️ GitHub Actions integration** – Embed agent pipelines directly into GitHub workflows for automated content generation, analysis, and reviews
+- **🛠️ Full MCP tooling** – Access file operations, web search, and custom tools from within deterministic shell scripts
+- **📊 Testable & debuggable** – Each agent stage produces explicit output files; inspect, validate, and iterate independently
+- **⚡ No infrastructure overhead** – No servers, containers, or external services; pure bash + LLM CLI orchestration
+- **🔗 Composable automation** – Chain agents into sophisticated pipelines: research → planning → writing → review → publication
+
+Perfect for content workflows, code generation, research automation and intelligent document processing at scale.
+
 ## 📦 Example: Essay Pipeline
 
     User topic → Planner → Writer → Reviewer → Final output
