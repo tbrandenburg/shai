@@ -14,7 +14,7 @@ Input File → Agent Process → Output File
 **Key Principles:**
 - Each agent reads **input files** (or none)
 - Each agent writes **required output files**
-- Each agent is called via `opencode run --file INPUT --prompt "..."`
+- Each agent is called via `opencode run "..."`
 - Output files are mandatory and verified before proceeding
 - All outputs go to the `output/` directory
 
