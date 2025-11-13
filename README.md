@@ -29,6 +29,12 @@ transparent and reproducible.
 
     User topic → Planner → Writer → Reviewer → Final output
 
+Call it via:
+
+```bash
+./scripts/pipeline_essay.sh "Scouts in Sweden"
+```
+
 Each agent:
 
 -   Receives a *single* input file (or none)
