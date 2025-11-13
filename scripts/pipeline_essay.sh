@@ -37,6 +37,12 @@ require_file() {
   fi
 }
 
+#############################################
+# Clean up previous outputs
+#############################################
+
+# Clean up previous output files
+rm -f "$OUTPUT_DIR/plan.md" "$OUTPUT_DIR/essay.md" "$OUTPUT_DIR/review.md"
 
 #############################################
 # STEP 1 — PLANNER (must use web search)

@@ -88,6 +88,8 @@ Agents MUST **NOT**:
 - **Run pipeline scripts** (`scripts/pipeline_essay.sh` or similar orchestrators)
 - **Execute shell commands** beyond what's needed for their designated task
 - **Modify or delete files** outside the output directories
+- **Ask the user for input** - Agents must work autonomously with provided context and files
+- **Read README.md** - Focus only on the task at hand, not your own project documentation
 
 ## 🚀 Creating New Agents
 
