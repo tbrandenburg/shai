@@ -136,13 +136,11 @@ Or test individual stages with your own prompts.
 
 Include instructions like:
 
-`You MUST perform multiple web searches to gather facts and context.`
+````
+You MUST perform multiple web searches to gather facts and context.
+...
 - **TIMEOUT SAFETY:** Keep searches focused on 2-3 key topics per search to avoid timeouts.
-
-## 🌗 Icons & Branding
-
-SHAI ships with a simple chai-inspired icon for: - Light mode
-- Dark mode (transparent background)
+````
 
 ## 📜 Philosophy
 
