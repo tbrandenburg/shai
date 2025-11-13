@@ -63,23 +63,23 @@ Each agent:
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUTPUT_FILE="$1"
+PLANNER_PROMPT="You are the **PLANNING STAGE** of a writing pipeline.
 
-PROMPT=$(cat <<EOF
-You are the PLANNING STAGE.
+MANDATORY BEHAVIOR:
+- You MUST perform a quick web search (keep them concise and targeted).
+- You MUST cite sources and incorporate findings into your outline.
+- You MUST use MCP tools to write the final outline to: \`${PLANNER_OUTPUT}\`
+- TIMEOUT SAFETY: Keep your searches focused and avoid overly long operations.
+- You MUST NOT finish without creating \`${PLANNER_OUTPUT}\`.
 
-MANDATORY:
-- Perform multiple web searches to understand the topic.
-- Extract relevant facts, debates, and context.
-- Write a structured outline to: ${OUTPUT_FILE} using MCP tools.
-- Do NOT finish your task without writing it.
+TASK:
+- Create a hierarchical outline for: \"${TOPIC}\"
+- Base it on your web research.
+- Keep your text response brief."
 
-Return only a summary of what you created.
-EOF
-)
+opencode run "$PLANNER_PROMPT"
 
-opencode run --prompt "$PROMPT"
-[[ -f "$OUTPUT_FILE" ]] || { echo "Planner failed: $OUTPUT_FILE missing"; exit 1; }
+[[ -f "$PLANNER_OUTPUT" ]] || { echo "Planner failed: $PLANNER_OUTPUT missing"; exit 1; }
 ```
 
 ## 🖇️ Example Pipeline Script
@@ -88,34 +88,56 @@ opencode run --prompt "$PROMPT"
 #!/usr/bin/env bash
 set -euo pipefail
 
-TOPIC="$1"
+TOPIC="${1:-}"
 
-./agents/planner.sh output/plan.md "$TOPIC"
-./agents/writer.sh output/plan.md output/essay.md
-./agents/reviewer.sh output/essay.md output/review.md
+if [[ -z "$TOPIC" ]]; then
+  echo "Usage: $0 \"Essay topic\""
+  exit 1
+fi
 
-echo "Pipeline finished. See output/ for results."
+OUTPUT_DIR="output"
+mkdir -p "$OUTPUT_DIR"
+
+PLANNER_OUTPUT="$OUTPUT_DIR/plan.md"
+WRITER_OUTPUT="$OUTPUT_DIR/essay.md"
+REVIEWER_OUTPUT="$OUTPUT_DIR/review.md"
+
+# Helper: Mandatory output enforcement
+require_file() {
+  local filename="$1"
+  if [[ ! -f "$filename" ]]; then
+    echo "ERROR: Required output file '$filename' was NOT created."
+    exit 1
+  fi
+}
+
+# Run each agent in sequence
+opencode run "Your PLANNER prompt here..."
+require_file "$PLANNER_OUTPUT"
+
+opencode run "Your WRITER prompt here..."
+require_file "$WRITER_OUTPUT"
+
+opencode run "Your REVIEWER prompt here..."
+require_file "$REVIEWER_OUTPUT"
+
+echo "Pipeline finished successfully!"
 ```
+
+## 🧪 Testing Your Pipeline
+
+``` bash
+bash scripts/pipeline_essay.sh "Evolution of renewable energy"
+```
+
+Or test individual stages with your own prompts.
 
 ## ⚙️ Web-Research Agents
 
 Include instructions like:
 
 `You MUST perform multiple web searches to gather facts and context.`
-
-## 🧪 Testing Your Pipeline
-
-``` bash
-bash agents/planner.sh output/plan.md "Evolution of renewable energy"
-bash agents/writer.sh output/plan.md output/essay.md
-bash agents/reviewer.sh output/essay.md output/review.md
-```
-
-Or run the entire chain:
-
-``` bash
-bash scripts/essay_pipeline.sh "The role of AI in climate modeling"
-```
+- **TIMEOUT SAFETY:** Keep searches focused on 2-3 key topics per search to avoid timeouts.
 
 ## 🌗 Icons & Branding
 
