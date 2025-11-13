@@ -151,6 +151,7 @@ Agents are small, replaceable, debuggable, and transparent.
 ## 🛠 Requirements
 
 -   Bash ≥ 4
+-   [opencode](https://github.com/sst/opencode) installed and a default model configured
 -   Any CLI-based LLM runner
 -   Optional MCP tools for file writing
 
