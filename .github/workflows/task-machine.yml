@@ -169,6 +169,10 @@ jobs:
           git commit -m "chore: run task machine for issue #$ISSUE_NUMBER"
           git push origin "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          
+          # Add branch link to issue comment
+          BRANCH_URL="https://github.com/${{ github.repository }}/tree/$BRANCH_NAME"
+          gh issue comment "$ISSUE_NUMBER" --body "🌿 **Branch created**: [\`$BRANCH_NAME\`]($BRANCH_URL)"
 
       - name: Send Telegram notification
         if: ${{ steps.git-status.outputs.has_changes == 'true' }}
