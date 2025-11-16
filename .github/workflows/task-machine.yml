@@ -117,8 +117,7 @@ jobs:
             echo "Conversation file missing"
             exit 1
           fi
-          prompt=$(cat "$PROMPT_FILE")
-          bash scripts/pipeline_task_machine.sh "$prompt"
+          bash scripts/pipeline_task_machine.sh --file "$PROMPT_FILE"
 
       - name: Detect repository changes
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
