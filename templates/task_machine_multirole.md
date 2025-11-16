@@ -1,5 +1,7 @@
 # Task Machine Template — Multi-Role Project Brief
 
+*Note: This template shows example roles and task patterns. Different projects may require completely different roles (e.g., Designer, Product Manager, QA Engineer, Marketing Specialist, etc.) depending on the specific requirements. Use only the roles that are genuinely relevant to your project.*
+
 ## Role Descriptions
 
 ### Role: Data Analyst
@@ -19,16 +21,8 @@
 
 ## Tasks
 
-- [ ] Analyze the weekly sales raw data as the **Data Analyst**, producing a concise summary of key findings.
-- [ ] Generate a CSV of aggregated weekly KPIs as the **Data Analyst** and save it to `$OUTPUT_FOLDER/kpi_summary.csv`.
-- [ ] Read the KPI CSV from `$OUTPUT_FOLDER/kpi_summary.csv` as the **Data Analyst** and produce a short interpretation of KPI trends.
-- [ ] Summarize user feedback into key themes as the **Data Analyst**, highlighting recurring patterns across sources.
-- [ ] Create a JSON export of clustered feedback as the **Data Analyst** and save it to `$OUTPUT_FOLDER/feedback_clusters.json`.
-- [ ] Read the clustered feedback JSON from `$OUTPUT_FOLDER/feedback_clusters.json` as the **Data Analyst** and extract the top 5 user pain points.
-- [ ] Write an engaging landing page introduction as the **Copywriter**, optimized for clarity, tone, and conversion.
-- [ ] Draft three alternative hero headlines as the **Copywriter** and save them to `$OUTPUT_FOLDER/headline_options.txt`.
-- [ ] Read the hero headline options from `$OUTPUT_FOLDER/headline_options.txt` as the **Copywriter** and select the strongest variant with justification.
-- [ ] Create a full product description draft as the **Copywriter** and save it to `$OUTPUT_FOLDER/product_description.md`.
-- [ ] Evaluate the new API design as the **Software Architect**, ensuring adherence to architectural principles and scalability.
-- [ ] Produce a system architecture review report as the **Software Architect** and write it to `$OUTPUT_FOLDER/architecture_review.txt`.
-- [ ] Read the architecture review report from `$OUTPUT_FOLDER/architecture_review.txt` as the **Software Architect** and provide a final recommendation summary.
+- [ ] [Data Analyst] Analyze the raw data sources and create a structured summary with key findings saved to `${OUTPUT_DIR}/data_summary.md`.
+- [ ] [Data Analyst] Read the data summary from `${OUTPUT_DIR}/data_summary.md` and extract the top 3 actionable insights.
+- [ ] [Copywriter] Review the insights and write user-friendly content optimized for clarity and engagement, saving it to `${OUTPUT_DIR}/final_content.md`.
+- [ ] [Software Architect] Evaluate technical requirements and create an implementation plan saved to `${OUTPUT_DIR}/tech_plan.txt`.
+- [ ] [Software Architect] Read the implementation plan from `${OUTPUT_DIR}/tech_plan.txt` and provide final recommendations.

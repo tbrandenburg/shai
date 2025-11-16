@@ -19,13 +19,15 @@ transparent and reproducible.
 ## 🚀 Features
 
 - 🧩 **Composable agent stages** written as standard shell scripts
-- 📁 **Strict file-based input/output** --- no hidden conversation
-  state
+- 📁 **Strict file-based input/output** --- no hidden conversation state
+- 🎯 **Multi-role task execution** with role-based task assignments
+- 📊 **Real-time progress tracking** with task completion counters
+- 🆔 **Parallel execution support** with unique ID-based output directories
 - 🔎 **Optional web-enabled agents** for research stages
-- 🔐 **Mandatory output verification** (stops pipeline if file
-  missing)
+- 🔐 **Mandatory output verification** (stops pipeline if file missing)
 - 🪢 **Pipeable workflows**---think Unix pipelines, but with agents
 - 💬 Works with any LLM CLI
+- 🤖 **GitHub Actions integration** for automated issue processing
 
 ## ✨ Why This Project Matters
 
@@ -39,6 +41,45 @@ Running agents with shell scripts unlocks powerful capabilities:
 - **🔗 Composable automation** – Chain agents into sophisticated pipelines: research → planning → writing → review → publication
 
 Perfect for content workflows, code generation, research automation and intelligent document processing at scale.
+
+## 📦 Example: Task Machine Pipeline
+
+    User request → Planner → Executor Loop → Completed tasks
+
+The **Task Machine** is SHAI's most advanced pipeline, featuring multi-role task execution with real-time progress tracking:
+
+```bash
+# Basic usage
+./scripts/pipeline_task_machine.sh "Create a weather dashboard app"
+
+# With unique ID for parallel execution
+./scripts/pipeline_task_machine.sh "Build user authentication" --id "auth-123"
+
+# Using input file
+./scripts/pipeline_task_machine.sh --file requirements.md --id "project-456"
+```
+
+### 🎯 Task Machine Features
+
+- **Multi-role execution**: Tasks are assigned to specific roles (Developer, Designer, Analyst, etc.)
+- **Progress tracking**: Real-time updates show `completed/total` tasks and remaining work
+- **Dynamic adaptation**: New subtasks can be added during execution
+- **Parallel execution**: Use `--id` to run multiple instances without conflicts
+- **GitHub integration**: Automatically triggered by `@task` comments in issues
+
+### Example Task Machine Output Structure
+
+```
+output/project-123/
+├── task_request.txt           # Original request
+└── task_machine_plan.md       # Plan with role assignments and progress
+```
+
+Each task in the plan follows this format:
+```markdown
+- [ ] [Developer] Set up project structure — Create folders, package.json, and basic configuration files
+- [x] [Designer] Create wireframes — Design user interface mockups for main screens
+```
 
 ## 📦 Example: Essay Pipeline
 
@@ -57,29 +98,57 @@ Each agent:
 -   Is called by a simple `opencode run "..."`
 -   Uses MCP tools to write output files internally
 
-## 🧠 Example Agent: Planner
+## 🧠 Example Agent: Task Machine Planner
 
 ``` bash
 #!/usr/bin/env bash
 set -euo pipefail
 
-PLANNER_PROMPT="You are the **PLANNING STAGE** of a writing pipeline.
+# Task Machine Planner with role-based assignments
+read -r -d '' PLANNER_PROMPT <<EOF || true
+You are the **TASK MACHINE PLANNER** in a two-stage pipeline.
 
 MANDATORY BEHAVIOR:
-- You MUST perform a quick web search (keep them concise and targeted).
-- You MUST cite sources and incorporate findings into your outline.
-- You MUST use MCP tools to write the final outline to: \`${PLANNER_OUTPUT}\`
-- TIMEOUT SAFETY: Keep your searches focused and avoid overly long operations.
-- You MUST NOT finish without creating \`${PLANNER_OUTPUT}\`.
+- Use MCP tools to read the user's goal from \`${CONTEXT_FILE}\`
+- Use MCP tools to read the multi-role template from \`${TEMPLATE_FILE}\`
+- Produce a markdown document written to: \`${PLAN_FILE}\`
+- The document MUST contain three sections:
+  1. \`## Context\` summarizing the overall objective
+  2. \`## Role Descriptions\` for each role needed
+  3. \`## Chronologic Task List\` with role assignments
+- Every task MUST specify which role is responsible:
+  \`- [ ] [Role Name] Task description — detailed instructions\`
+- Keep the plan lightweight and avoid unnecessary busywork
+- This workflow is UNSUPERVISED: make decisions autonomously
 
-TASK:
-- Create a hierarchical outline for: \"${TOPIC}\"
-- Base it on your web research.
-- Keep your text response brief."
+TASK: Create the plan for the request in \`${CONTEXT_FILE}\`
+EOF
 
 opencode run "$PLANNER_PROMPT"
 
-[[ -f "$PLANNER_OUTPUT" ]] || { echo "Planner failed: $PLANNER_OUTPUT missing"; exit 1; }
+[[ -f "$PLAN_FILE" ]] || { echo "Planner failed: $PLAN_FILE missing"; exit 1; }
+```
+
+## 🔄 Example Agent: Task Machine Executor
+
+``` bash
+# Executor loop with progress tracking
+iteration=1
+while grep -q "\\[ \\]" "$PLAN_FILE"; do
+  # Count progress
+  total_tasks=$(grep -c "^- \[.\]" "$PLAN_FILE" || echo "0")
+  completed_tasks=$(grep -c "^- \[x\]" "$PLAN_FILE" || echo "0")
+  remaining_tasks=$(grep -c "^- \[ \]" "$PLAN_FILE" || echo "0")
+  
+  echo "Iteration ${iteration}... (${completed_tasks}/${total_tasks} completed, ${remaining_tasks} remaining)"
+  
+  # Execute first unchecked task
+  opencode run "$EXECUTOR_PROMPT"
+  
+  iteration=$((iteration + 1))
+done
+
+echo "All tasks completed! (${final_completed_tasks}/${final_total_tasks} tasks finished)"
 ```
 
 ## 🖇️ Example Pipeline Script
@@ -88,19 +157,40 @@ opencode run "$PLANNER_PROMPT"
 #!/usr/bin/env bash
 set -euo pipefail
 
-TOPIC="${1:-}"
+# Task Machine Pipeline with ID support
+INPUT_ARG=""
+ID_ARG=""
+CONTEXT_FILE=""
 
-if [[ -z "$TOPIC" ]]; then
-  echo "Usage: $0 \"Essay topic\""
-  exit 1
+# Parse arguments for flexible usage
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --id)
+      ID_ARG="$2"
+      shift 2
+      ;;
+    --file)
+      CONTEXT_FILE="$2"
+      shift 2
+      ;;
+    *)
+      if [[ -z "$INPUT_ARG" ]]; then
+        INPUT_ARG="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Set output directory with optional ID suffix
+if [[ -n "$ID_ARG" ]]; then
+  OUTPUT_DIR="output/${ID_ARG}"
+else
+  OUTPUT_DIR="output"
 fi
-
-OUTPUT_DIR="output"
 mkdir -p "$OUTPUT_DIR"
 
-PLANNER_OUTPUT="$OUTPUT_DIR/plan.md"
-WRITER_OUTPUT="$OUTPUT_DIR/essay.md"
-REVIEWER_OUTPUT="$OUTPUT_DIR/review.md"
+PLAN_FILE="$OUTPUT_DIR/task_machine_plan.md"
 
 # Helper: Mandatory output enforcement
 require_file() {
@@ -111,23 +201,70 @@ require_file() {
   fi
 }
 
-# Run each agent in sequence
-opencode run "Your PLANNER prompt here..."
-require_file "$PLANNER_OUTPUT"
+# Run planner
+opencode run "$PLANNER_PROMPT"
+require_file "$PLAN_FILE"
 
-opencode run "Your WRITER prompt here..."
-require_file "$WRITER_OUTPUT"
+# Run executor loop with progress tracking
+iteration=1
+while grep -q "\\[ \\]" "$PLAN_FILE"; do
+  # Progress tracking
+  total_tasks=$(grep -c "^- \[.\]" "$PLAN_FILE" || echo "0")
+  completed_tasks=$(grep -c "^- \[x\]" "$PLAN_FILE" || echo "0")
+  remaining_tasks=$(grep -c "^- \[ \]" "$PLAN_FILE" || echo "0")
+  
+  echo "Running executor iteration ${iteration}... (${completed_tasks}/${total_tasks} completed, ${remaining_tasks} remaining)"
+  
+  opencode run "$EXECUTOR_PROMPT"
+  require_file "$PLAN_FILE"
+  
+  iteration=$((iteration + 1))
+done
 
-opencode run "Your REVIEWER prompt here..."
-require_file "$REVIEWER_OUTPUT"
-
-echo "Pipeline finished successfully!"
+echo "All tasks completed!"
 ```
+
+## 🤖 GitHub Actions Integration
+
+SHAI includes automated GitHub Actions integration for issue-based task processing:
+
+```yaml
+# Triggered by @task comments in issues
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, edited, reopened]
+
+jobs:
+  task-machine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run task machine pipeline
+        run: |
+          bash scripts/pipeline_task_machine.sh --file "$PROMPT_FILE" --id "$ISSUE_NUMBER"
+```
+
+Features:
+- **Admin-only execution**: Only repository admins can trigger `@task`
+- **Automatic ID assignment**: Uses issue number for unique output directories
+- **Progress tracking**: Shows real-time task completion in issue comments
+- **File isolation**: Each issue gets its own output directory (`output/123/`, `output/456/`)
 
 ## 🧪 Testing Your Pipeline
 
 ``` bash
+# Test task machine locally
+bash scripts/pipeline_task_machine.sh "Create a todo app"
+
+# Test with ID for parallel execution
+bash scripts/pipeline_task_machine.sh "Build API endpoints" --id "backend-dev"
+
+# Test essay pipeline
 bash scripts/pipeline_essay.sh "Evolution of renewable energy"
+
+# Test with file input
+bash scripts/pipeline_task_machine.sh --file requirements.md --id "project-123"
 ```
 
 Or test individual stages with your own prompts.

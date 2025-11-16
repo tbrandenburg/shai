@@ -66,7 +66,7 @@ jobs:
       - name: Collect full issue conversation
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
-          mkdir -p output
+          mkdir -p "output/${ISSUE_NUMBER}"
           gh issue view "$ISSUE_NUMBER" \
             --json title,body,author,comments \
             --jq '{
@@ -74,18 +74,18 @@ jobs:
               body: .body // "",
               author: .author.login,
               comments: [(.comments[]? | {author: .author.login, createdAt: .createdAt, body: .body})]
-            }' > output/issue_context.json
+            }' > "output/${ISSUE_NUMBER}/issue_context.json"
 
           {
-            echo "# Issue #$ISSUE_NUMBER — $(jq -r '.title' output/issue_context.json)"
+            echo "# Issue #$ISSUE_NUMBER — $(jq -r '.title' "output/${ISSUE_NUMBER}/issue_context.json")"
             echo
-            echo "## Original Post by @$(jq -r '.author' output/issue_context.json)"
+            echo "## Original Post by @$(jq -r '.author' "output/${ISSUE_NUMBER}/issue_context.json")"
             echo
-            jq -r '.body' output/issue_context.json
+            jq -r '.body' "output/${ISSUE_NUMBER}/issue_context.json"
             echo
             echo "## Comments"
-            jq -r '.comments // [] | map("### Comment by @" + .author + " (" + .createdAt + ")\n\n" + (.body // "") + "\n")[]' output/issue_context.json
-          } > output/issue_conversation.md
+            jq -r '.comments // [] | map("### Comment by @" + .author + " (" + .createdAt + ")\n\n" + (.body // "") + "\n")[]' "output/${ISSUE_NUMBER}/issue_context.json"
+          } > "output/${ISSUE_NUMBER}/issue_conversation.md"
 
       - name: React to @task request with 👀
         if: ${{ steps.admin.outputs.is_admin == 'true' && github.event_name == 'issue_comment' }}
@@ -116,19 +116,19 @@ jobs:
       - name: Configure opencode
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
-          mkdir -p "$HOME/.opencode"
-          cp .github/opencode/config.json "$HOME/.opencode/config.json"
+          mkdir -p "$HOME/.config/opencode"
+          cp .github/opencode/config.json "$HOME/.config/opencode/config.json"
 
       - name: Run task machine pipeline
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         env:
-          PROMPT_FILE: output/issue_conversation.md
+          PROMPT_FILE: output/${ISSUE_NUMBER}/issue_conversation.md
         run: |
           if [[ ! -f "$PROMPT_FILE" ]]; then
-            echo "Conversation file missing"
+            echo "Conversation file missing: $PROMPT_FILE"
             exit 1
           fi
-          bash scripts/pipeline_task_machine.sh --file "$PROMPT_FILE"
+          bash scripts/pipeline_task_machine.sh --file "$PROMPT_FILE" --id "$ISSUE_NUMBER"
 
       - name: Detect repository changes
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
@@ -154,11 +154,12 @@ jobs:
       - name: Provide answer to latest request
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
-          if [[ ! -f output/task_machine_plan.md ]]; then
-            echo "Task machine output missing"
+          PLAN_FILE="output/${ISSUE_NUMBER}/task_machine_plan.md"
+          if [[ ! -f "$PLAN_FILE" ]]; then
+            echo "Task machine output missing: $PLAN_FILE"
             exit 1
           fi
-          gh issue comment "$ISSUE_NUMBER" --body-file output/task_machine_plan.md
+          gh issue comment "$ISSUE_NUMBER" --body-file "$PLAN_FILE"
 
   unauthorized:
     name: Notify unauthorized commenters
