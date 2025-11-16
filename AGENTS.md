@@ -57,6 +57,13 @@ opencode run --file output/essay.md "Your prompt..."
 bash scripts/pipeline_essay.sh "Evolution of renewable energy"
 ```
 
+### Task Machine Pipeline
+```bash
+bash scripts/pipeline_task_machine.sh "High-level project brief"
+```
+
+This pipeline runs a planner that produces `output/task_machine_plan.md` with a `## Context` section and a chronological checkbox task list (`- [ ] ...`). An executor loop then repeatedly calls the executor agent to take the **first** unchecked task, complete it, and mark the entry as `- [x] ...` (adding any follow-up subtasks directly beneath the completed item). The loop stops when no unchecked tasks remain.
+
 ## 📂 Directory Structure
 
 ```
