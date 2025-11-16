@@ -1,10 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TASK_CONTEXT="${1:-}"
+INPUT_ARG="${1:-}"
+
+show_usage() {
+  cat <<'USAGE'
+Usage: pipeline_task_machine.sh "High level task description"
+   or: pipeline_task_machine.sh --file path/to/request.md
+USAGE
+}
+
+if [[ -z "$INPUT_ARG" ]]; then
+  show_usage
+  exit 1
+fi
+
+if [[ "$INPUT_ARG" == "--file" ]]; then
+  CONTEXT_FILE="${2:-}"
+  if [[ -z "$CONTEXT_FILE" ]]; then
+    echo "ERROR: Missing file path after --file."
+    show_usage
+    exit 1
+  fi
+  if [[ ! -f "$CONTEXT_FILE" ]]; then
+    echo "ERROR: Task context file '$CONTEXT_FILE' not found."
+    exit 1
+  fi
+  TASK_CONTEXT="$(cat "$CONTEXT_FILE")"
+else
+  if [[ -f "$INPUT_ARG" ]]; then
+    TASK_CONTEXT="$(cat "$INPUT_ARG")"
+  else
+    TASK_CONTEXT="$INPUT_ARG"
+  fi
+fi
 
 if [[ -z "$TASK_CONTEXT" ]]; then
-  echo "Usage: $0 \"High level task description\""
+  echo "ERROR: Task context is empty. Provide text or a file with content."
   exit 1
 fi
 
