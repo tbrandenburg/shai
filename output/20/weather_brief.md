@@ -1,0 +1,9 @@
+- Observation time: 2025-11-16 21:30 CET (Europe/Stockholm)
+  - Temperature: 1.6 C; relative humidity 94%
+  - Feels-like (apparent): -1.7 C due to a light breeze
+  - Precipitation: 0.0 mm reported over the last 15 minutes; next-hour precipitation probability peaks near 11% around 22:00 CET
+  - Wind: 9 km/h sustained with gusts up to 16.9 km/h
+- Alerts: None in effect for Stockholm County according to MET Norway MetAlerts (checked 2025-11-16 21:32 CET)
+- Sources:
+  - https://api.open-meteo.com/v1/forecast?latitude=59.3293&longitude=18.0686&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,relative_humidity_2m,weather_code&hourly=precipitation_probability&timezone=Europe%2FStockholm
+  - https://api.met.no/weatherapi/metalerts/2.0/current.json?lat=59.3293&lon=18.0686
