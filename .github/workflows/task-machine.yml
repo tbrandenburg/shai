@@ -130,6 +130,16 @@ jobs:
           fi
           bash scripts/pipeline_task_machine.sh --file "$PROMPT_FILE"
 
+      - name: Persist final plan for git diff
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        env:
+          PLAN_ARCHIVE: .github/task-machine/issue-${{ github.event.issue.number }}.md
+        run: |
+          if [[ -f output/task_machine_plan.md ]]; then
+            mkdir -p "$(dirname "$PLAN_ARCHIVE")"
+            cp output/task_machine_plan.md "$PLAN_ARCHIVE"
+          fi
+
       - name: Detect repository changes
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         id: git-status
