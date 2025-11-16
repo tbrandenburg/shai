@@ -1,0 +1,159 @@
+name: Task Machine Issue Runner
+
+on:
+  issue_comment:
+    types:
+      - created
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  task-machine:
+    name: Run task machine for admin @task comments
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '@task') &&
+      github.event.comment.author_association == 'OWNER'
+    runs-on: ubuntu-latest
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+      REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify commenter is repo admin
+        id: admin
+        run: |
+          permission=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/$REPOSITORY/collaborators/$COMMENT_AUTHOR/permission" \
+            --jq '.permission // ""')
+          if [[ "$permission" == "admin" ]]; then
+            echo "is_admin=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_admin=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop when commenter is not admin
+        if: ${{ steps.admin.outputs.is_admin != 'true' }}
+        run: |
+          echo "Skipping because @$COMMENT_AUTHOR lacks admin permission."
+          exit 0
+
+      - name: Configure Git
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Collect full issue conversation
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          mkdir -p output
+          gh issue view "$ISSUE_NUMBER" \
+            --json title,body,author,comments \
+            --jq '{
+              title: .title,
+              body: .body // "",
+              author: .author.login,
+              comments: [(.comments[]? | {author: .author.login, createdAt: .createdAt, body: .body})]
+            }' > output/issue_context.json
+
+          {
+            echo "# Issue #$ISSUE_NUMBER — $(jq -r '.title' output/issue_context.json)"
+            echo
+            echo "## Original Post by @$(jq -r '.author' output/issue_context.json)"
+            echo
+            jq -r '.body' output/issue_context.json
+            echo
+            echo "## Comments"
+            jq -r '.comments // [] | map("### Comment by @" + .author + " (" + .createdAt + ")\n\n" + (.body // "") + "\n")[]' output/issue_context.json
+          } > output/issue_conversation.md
+
+      - name: React to @task request with 👀
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          gh api \
+            -X POST \
+            -H "Accept: application/vnd.github.squirrel-girl-preview+json" \
+            "/repos/$REPOSITORY/issues/comments/$COMMENT_ID/reactions" \
+            -f content='eyes'
+
+      - name: Install sst/opencode
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Run task machine pipeline
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        env:
+          PROMPT_FILE: output/issue_conversation.md
+        run: |
+          if [[ ! -f "$PROMPT_FILE" ]]; then
+            echo "Conversation file missing"
+            exit 1
+          fi
+          prompt=$(cat "$PROMPT_FILE")
+          bash scripts/pipeline_task_machine.sh "$prompt"
+
+      - name: Detect repository changes
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        id: git-status
+        run: |
+          if git status --porcelain | grep .; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create branch and commit task results
+        if: ${{ steps.git-status.outputs.has_changes == 'true' }}
+        env:
+          BRANCH_NAME: task-machine/issue-${{ github.event.issue.number }}-${{ github.run_id }}
+        run: |
+          git checkout -b "$BRANCH_NAME"
+          git add -A
+          git commit -m "chore: run task machine for issue #$ISSUE_NUMBER"
+          git push origin "$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Provide answer to latest request
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          if [[ ! -f output/task_machine_plan.md ]]; then
+            echo "Task machine output missing"
+            exit 1
+          fi
+          gh issue comment "$ISSUE_NUMBER" --body-file output/task_machine_plan.md
+
+  unauthorized:
+    name: Notify unauthorized commenters
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '@task') &&
+      github.event.comment.author_association != 'OWNER'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Post unauthorized message
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ @${context.actor} only repository admins can trigger @task. Please ask an admin to run it.`
+            });
