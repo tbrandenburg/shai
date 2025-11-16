@@ -16,6 +16,14 @@ OUTPUT_DIR="output"
 mkdir -p "$OUTPUT_DIR"
 
 PLAN_FILE="$OUTPUT_DIR/task_machine_plan.md"
+TEMPLATE_FILE="templates/task_machine_multirole.md"
+
+if [[ ! -f "$TEMPLATE_FILE" ]]; then
+  echo "ERROR: Required task template '$TEMPLATE_FILE' not found."
+  exit 1
+fi
+
+PLANNER_TEMPLATE_CONTENT="$(cat "$TEMPLATE_FILE")"
 
 #############################################
 # Helper: Mandatory output enforcement
@@ -41,7 +49,7 @@ rm -f "$PLAN_FILE"
 
 echo "Running Task Machine Planner..."
 
-PLANNER_PROMPT="You are the **TASK MACHINE PLANNER** in a two-stage pipeline.\n\nMANDATORY BEHAVIOR:\n- Read the user's high-level goal and constraints.\n- Produce a markdown document written to: \`${PLAN_FILE}\`.\n- The document MUST contain two sections: \n  1. \`## Context\` summarizing the overall objective.\n  2. \`## Chronologic Task List\` describing step-by-step tasks.\n- Every task MUST be self-contained, independent, and formatted as a markdown checkbox line in chronological order, e.g. \`- [ ] Task name — clear, actionable instructions...\`.\n- Include all details needed to execute each task without referencing other tasks.\n- Do NOT mark any task as completed.\n- You MUST use MCP tools to write the document and MUST NOT finish without creating \`${PLAN_FILE}\`.\n\nTASK:\nCreate the plan for the following goal:\n\n${TASK_CONTEXT}"
+PLANNER_PROMPT="You are the **TASK MACHINE PLANNER** in a two-stage pipeline.\n\nMANDATORY BEHAVIOR:\n- Read the user's high-level goal and constraints.\n- Produce a markdown document written to: \`${PLAN_FILE}\`.\n- The document MUST contain two sections: \n  1. \`## Context\` summarizing the overall objective.\n  2. \`## Chronologic Task List\` describing step-by-step tasks.\n- Every task MUST be self-contained, independent, and formatted as a markdown checkbox line in chronological order, e.g. \`- [ ] Task name — clear, actionable instructions...\`.\n- Include all details needed to execute each task without referencing other tasks.\n- Do NOT mark any task as completed.\n- You MUST use MCP tools to write the document and MUST NOT finish without creating \`${PLAN_FILE}\`.\n- You MUST incorporate the provided task template verbatim and ensure each listed role requirement is addressed.\n\nTASK TEMPLATE:\n${PLANNER_TEMPLATE_CONTENT}\n\nTASK:\nCreate the plan for the following goal:\n\n${TASK_CONTEXT}"
 
 opencode run "$PLANNER_PROMPT"
 
