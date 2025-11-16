@@ -1,0 +1,1 @@
+{"author":"tbrandenburg","body":"@task Write a simple uv python roll-the-dice project. I want to call it via uv run roll-dice. It should return a random number between 1 and 6.","comments":[],"title":"Code"}

@@ -1,0 +1,20 @@
+[project]
+name = "roll-dice"
+version = "0.1.0"
+description = "CLI utility that prints a random integer from 1 to 6"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Task Machine" }
+]
+dependencies = []
+
+[project.scripts]
+roll-dice = "roll_dice.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
