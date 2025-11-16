@@ -152,12 +152,12 @@ jobs:
           BRANCH_NAME: task-machine/issue-${{ github.event.issue.number }}-${{ github.run_id }}
         run: |
           git checkout -b "$BRANCH_NAME"
-          # Add all files except workflow files (requires workflows permission)
-          git add . ':!.github/workflows/*'
+          # Only add files from the output directory
+          git add output/
           
-          # Check if there are actually files to commit after exclusion
+          # Check if there are actually files to commit in output/
           if git diff --cached --quiet; then
-            echo "No files to commit after excluding workflows"
+            echo "No files to commit in output/ directory"
             exit 0
           fi
           
