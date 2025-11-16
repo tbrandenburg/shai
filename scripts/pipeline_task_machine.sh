@@ -128,7 +128,6 @@ MANDATORY BEHAVIOR:
 - Study the template's task patterns: how roles collaborate, file dependencies between tasks, and the structured workflow approach.
 - Adapt the template's proven patterns to the user's request: use similar role collaboration, file handoffs, and task sequencing where applicable.
 - NEVER copy or quote any portion of the template verbatim in the plan. Summaries must be rephrased in your own words.
-- Replace \`\$OUTPUT_FOLDER\` references in adapted tasks with \`${OUTPUT_DIR}\`.
 - Produce a markdown document written to: \`${PLAN_FILE}\` with three sections: 
   1. \`## Context\` summarizing the overall objective.
   2. \`## Role Descriptions\` distilling the purpose, focus and style for each role from the template, rewritten for this scenario.
@@ -173,6 +172,7 @@ You are the **TASK MACHINE EXECUTOR**.
 MANDATORY BEHAVIOR:
 - Use MCP tools to read the shared plan at \`${PLAN_FILE}\`.
 - Review the Context section to understand the overall objective.
+- Set your working directory to \`${OUTPUT_DIR}\` for all file operations.
 - Identify the FIRST unchecked task (first line containing \`- [ ]\`) and execute ONLY that task.
 - Before executing, adopt the role specified in brackets (e.g., [Data Analyst], [Developer]) and approach the task from that role's perspective, expertise, and working style.
 - After completing the task, update the same line to \`- [x]\` and add a summary as an indented sub-point using \`* Summary: ...\` format on the next line.
