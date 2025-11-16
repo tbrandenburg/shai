@@ -4,6 +4,11 @@ on:
   issue_comment:
     types:
       - created
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
 
 permissions:
   contents: write
@@ -12,42 +17,45 @@ permissions:
 
 jobs:
   task-machine:
-    name: Run task machine for admin @task comments
+    name: Run task machine for admin @task requests
     if: |
       github.event.issue.pull_request == null &&
-      contains(github.event.comment.body, '@task') &&
-      github.event.comment.author_association == 'OWNER'
+      (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@task') && github.event.comment.author_association == 'OWNER') ||
+        (github.event_name == 'issues' && contains(github.event.issue.body, '@task'))
+      )
     runs-on: ubuntu-latest
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number }}
-      COMMENT_ID: ${{ github.event.comment.id }}
-      COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+      COMMENT_ID: ${{ github.event.comment.id || '' }}
+      TRIGGER_ACTOR: ${{ github.event.comment.user.login || github.event.sender.login }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Verify commenter is repo admin
+      - name: Verify triggering actor is repo admin
         id: admin
         run: |
           permission=$(gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/$REPOSITORY/collaborators/$COMMENT_AUTHOR/permission" \
-            --jq '.permission // ""')
+            "/repos/$REPOSITORY/collaborators/$TRIGGER_ACTOR/permission" \
+            --jq '.permission // ""' 2>/dev/null || echo '')
           if [[ "$permission" == "admin" ]]; then
             echo "is_admin=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_admin=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Stop when commenter is not admin
+      - name: Stop when actor is not admin
         if: ${{ steps.admin.outputs.is_admin != 'true' }}
         run: |
-          echo "Skipping because @$COMMENT_AUTHOR lacks admin permission."
+          echo "Skipping because @$TRIGGER_ACTOR lacks admin permission."
           exit 0
+
+      - name: Checkout repository
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure Git
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
@@ -80,7 +88,7 @@ jobs:
           } > output/issue_conversation.md
 
       - name: React to @task request with 👀
-        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        if: ${{ steps.admin.outputs.is_admin == 'true' && github.event_name == 'issue_comment' }}
         run: |
           gh api \
             -X POST \
@@ -145,6 +153,7 @@ jobs:
   unauthorized:
     name: Notify unauthorized commenters
     if: |
+      github.event_name == 'issue_comment' &&
       github.event.issue.pull_request == null &&
       contains(github.event.comment.body, '@task') &&
       github.event.comment.author_association != 'OWNER'
