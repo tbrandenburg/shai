@@ -159,6 +159,7 @@ jobs:
 
       - name: Create branch and commit task results
         if: ${{ steps.git-status.outputs.has_changes == 'true' }}
+        id: branch
         env:
           BRANCH_NAME: task-machine/issue-${{ github.event.issue.number }}-${{ github.run_id }}
         run: |
@@ -168,6 +169,39 @@ jobs:
           git commit -m "chore: run task machine for issue #$ISSUE_NUMBER"
           git push origin "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Send Telegram notification
+        if: ${{ steps.git-status.outputs.has_changes == 'true' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          REPO="${{ github.repository }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          ISSUE_URL="https://github.com/$REPO/issues/$ISSUE_NUMBER"
+          BRANCH_URL="https://github.com/$REPO/tree/$BRANCH_NAME"
+          WORKFLOW_URL="https://github.com/$REPO/actions/runs/${{ github.run_id }}"
+          
+          # Escape special characters for MarkdownV2
+          ESCAPED_TITLE=$(echo "$ISSUE_TITLE" | sed 's/[-_*\[\]()~`>#+=|{}.!]/\\&/g')
+          ESCAPED_REPO=$(echo "$REPO" | sed 's/[-_*\[\]()~`>#+=|{}.!]/\\&/g')
+          ESCAPED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[-_*\[\]()~`>#+=|{}.!]/\\&/g')
+          
+          MSG=$(printf '%s\n' \
+            "🤖 *Task Machine completed for $ESCAPED_REPO*" \
+            "" \
+            "*Issue \\#$ISSUE_NUMBER:* $ESCAPED_TITLE" \
+            "*Branch:* [\`$ESCAPED_BRANCH\`]($BRANCH_URL)" \
+            "" \
+            "*View:* [Issue]($ISSUE_URL) \\| [Branch]($BRANCH_URL) \\| [Workflow]($WORKFLOW_URL)" \
+          )
+          
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d "chat_id=$TELEGRAM_CHAT_ID" \
+            -d "parse_mode=MarkdownV2" \
+            -d "text=$MSG" \
+            -d "disable_web_page_preview=true"
 
       - name: Provide answer to latest request
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
