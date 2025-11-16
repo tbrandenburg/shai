@@ -121,11 +121,12 @@ jobs:
 
       - name: Run task machine pipeline
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
-        env:
-          PROMPT_FILE: output/${ISSUE_NUMBER}/issue_conversation.md
         run: |
+          PROMPT_FILE="output/${ISSUE_NUMBER}/issue_conversation.md"
           if [[ ! -f "$PROMPT_FILE" ]]; then
             echo "Conversation file missing: $PROMPT_FILE"
+            echo "Contents of output/${ISSUE_NUMBER}:"
+            ls -la "output/${ISSUE_NUMBER}/" || echo "Directory does not exist"
             exit 1
           fi
           bash scripts/pipeline_task_machine.sh --file "$PROMPT_FILE" --id "$ISSUE_NUMBER"
