@@ -94,6 +94,9 @@ opencode run "$PLANNER_PROMPT"
 
 require_file "$PLAN_FILE"
 echo "Planner completed: ${PLAN_FILE}"
+echo "\n===== Task Plan ====="
+cat "$PLAN_FILE"
+echo "===== End Task Plan =====\n"
 echo ""
 
 #############################################
