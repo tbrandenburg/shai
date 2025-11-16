@@ -152,7 +152,15 @@ jobs:
           BRANCH_NAME: task-machine/issue-${{ github.event.issue.number }}-${{ github.run_id }}
         run: |
           git checkout -b "$BRANCH_NAME"
-          git add -A
+          # Add all files except workflow files (requires workflows permission)
+          git add . ':!.github/workflows/*'
+          
+          # Check if there are actually files to commit after exclusion
+          if git diff --cached --quiet; then
+            echo "No files to commit after excluding workflows"
+            exit 0
+          fi
+          
           git commit -m "chore: run task machine for issue #$ISSUE_NUMBER"
           git push origin "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
