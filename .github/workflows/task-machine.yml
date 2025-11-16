@@ -12,7 +12,11 @@ permissions:
 
 jobs:
   task-machine:
-    if: ${{ github.event.issue.pull_request == null && contains(github.event.comment.body, '@task') }}
+    name: Run task machine for admin @task comments
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '@task') &&
+      github.event.comment.author_association == 'OWNER'
     runs-on: ubuntu-latest
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -21,8 +25,10 @@ jobs:
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Verify commenter is repo admin
         id: admin
@@ -43,47 +49,45 @@ jobs:
           echo "Skipping because @$COMMENT_AUTHOR lacks admin permission."
           exit 0
 
+      - name: Configure Git
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Collect full issue conversation
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
           mkdir -p output
-          issue_title=$(gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$REPOSITORY/issues/$ISSUE_NUMBER" \
-            --jq '.title')
-          issue_author=$(gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$REPOSITORY/issues/$ISSUE_NUMBER" \
-            --jq '.user.login')
-          issue_body=$(gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/$REPOSITORY/issues/$ISSUE_NUMBER" \
-            --jq '.body // ""')
+          gh issue view "$ISSUE_NUMBER" \
+            --json title,body,author,comments \
+            --jq '{
+              title: .title,
+              body: .body // "",
+              author: .author.login,
+              comments: [(.comments[]? | {author: .author.login, createdAt: .createdAt, body: .body})]
+            }' > output/issue_context.json
 
           {
-            echo "# Issue #$ISSUE_NUMBER — $issue_title"
+            echo "# Issue #$ISSUE_NUMBER — $(jq -r '.title' output/issue_context.json)"
             echo
-            echo "## Original Post by @$issue_author"
+            echo "## Original Post by @$(jq -r '.author' output/issue_context.json)"
             echo
-            echo "$issue_body"
+            jq -r '.body' output/issue_context.json
             echo
             echo "## Comments"
-            gh api --paginate \
-              -H "Accept: application/vnd.github+json" \
-              "/repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments" \
-              --jq '.[] | "### Comment by @\(.user.login) (\(.created_at))\\n\\n\(.body // \"\")\\n"'
+            jq -r '.comments // [] | map("### Comment by @" + .author + " (" + .createdAt + ")\n\n" + (.body // "") + "\n")[]' output/issue_context.json
           } > output/issue_conversation.md
 
       - name: Acknowledge @task request with 👀
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
           comment_link="https://github.com/$REPOSITORY/issues/$ISSUE_NUMBER#issuecomment-$COMMENT_ID"
-          body=$'👀 Tracking the @task request in '"$comment_link"'.'
           gh api \
             -X POST \
             -H "Accept: application/vnd.github+json" \
             "/repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments" \
-            -f body="$body"
+            -f body=$'👀 Noted the @task request here: '"$comment_link"
 
       - name: Install sst/opencode
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
@@ -118,8 +122,6 @@ jobs:
         env:
           BRANCH_NAME: task-machine/issue-${{ github.event.issue.number }}-${{ github.run_id }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH_NAME"
           git add -A
           git commit -m "chore: run task machine for issue #$ISSUE_NUMBER"
@@ -134,3 +136,25 @@ jobs:
             exit 1
           fi
           gh issue comment "$ISSUE_NUMBER" --body-file output/task_machine_plan.md
+
+  unauthorized:
+    name: Notify unauthorized commenters
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '@task') &&
+      github.event.comment.author_association != 'OWNER'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Post unauthorized message
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ @${context.actor} only repository admins can trigger @task. Please ask an admin to run it.`
+            });
