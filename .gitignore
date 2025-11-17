@@ -206,3 +206,12 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# SHAI Agent Pipeline
+# Ignore files directly under input/ and output/ but allow subdirectories
+input/*
+!input/*/
+output/*
+!output/*/
+
+# Ignore files directly under resources/
+resources/*
