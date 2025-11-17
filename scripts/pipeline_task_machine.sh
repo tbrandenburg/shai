@@ -200,6 +200,7 @@ MANDATORY BEHAVIOR:
 - Use MCP tools to rewrite the updated plan back to \`${PLAN_FILE}\` before finishing.
 - Keep your console response brief; the authoritative record is the plan file.
 - This workflow is UNSUPERVISED: do not ask questions or seek confirmation—make decisions yourself based solely on the provided task description and files.
+- Whenever you need up-to-date, version-specific library documentation or code examples, query the **context7 MCP server** to gather that information before proceeding.
 
 TASK:
 Complete only the first open task in the plan.
