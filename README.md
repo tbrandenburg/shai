@@ -302,4 +302,8 @@ PRs and issues welcome!
 
 MIT
 
+## Credits
+
+Credits to [Cole Medin](https://github.com/coleam00/) for some of his ideas used here.
+
 ## 🫖 Enjoy your shai!
