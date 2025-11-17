@@ -63,6 +63,23 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Checkout existing issue branch if present
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          set -euo pipefail
+          BRANCH_NAME="task-machine-${ISSUE_NUMBER}"
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH_NAME"
+            if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+              git checkout "$BRANCH_NAME"
+            else
+              git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
+            fi
+            echo "Found existing branch $BRANCH_NAME; checked out for continued work."
+          else
+            echo "No existing task-machine branch for issue #$ISSUE_NUMBER. Staying on default branch until changes are ready."
+          fi
+
       - name: Collect full issue conversation
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
@@ -160,10 +177,14 @@ jobs:
       - name: Create branch and commit task results
         if: ${{ steps.git-status.outputs.has_changes == 'true' }}
         id: branch
-        env:
-          BRANCH_NAME: task-machine/issue-${{ github.event.issue.number }}-${{ github.run_id }}
         run: |
-          git checkout -b "$BRANCH_NAME"
+          set -euo pipefail
+          BRANCH_NAME="task-machine-${ISSUE_NUMBER}"
+          if git rev-parse --verify "$BRANCH_NAME" >/dev/null 2>&1; then
+            git checkout "$BRANCH_NAME"
+          else
+            git checkout -b "$BRANCH_NAME"
+          fi
           # Only add files from the output directory
           git add output/
           git commit -m "chore: run task machine for issue #$ISSUE_NUMBER"

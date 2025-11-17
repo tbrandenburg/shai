@@ -124,6 +124,7 @@ read -r -d '' PLANNER_PROMPT <<EOF || true
 You are the **TASK MACHINE PLANNER** in a two-stage pipeline.
 
 MANDATORY BEHAVIOR:
+- Before planning, scan the output directory at \`${OUTPUT_DIR}\` for any previously created artifacts so your plan builds on the latest work.
 - Use MCP tools to read both the user's high-level goal from \`${CONTEXT_FILE}\` and the multi-role task template stored at \`${TEMPLATE_FILE}\`.
 - Study the template's task patterns: how roles collaborate, file dependencies between tasks, and the structured workflow approach.
 - Adapt the template's proven patterns to the user's request: use similar role collaboration, file handoffs, and task sequencing where applicable.
@@ -142,6 +143,7 @@ MANDATORY BEHAVIOR:
 
 TASK:
 Create the plan for the request described in the context file stored at \`${CONTEXT_FILE}\`.
+
 EOF
 
 opencode run "$PLANNER_PROMPT"
