@@ -1,28 +1,25 @@
 # Task Machine Template — Multi-Role Project Brief
 
-*Note: This template shows example roles and task patterns. Different projects may require completely different roles (e.g., Designer, Product Manager, QA Engineer, Marketing Specialist, etc.) depending on the specific requirements. Use only the roles that are genuinely relevant to your project.*
+*Note: This template demonstrates two approaches for role definitions: (1) Reference existing agents from the `.github/agents` folder when suitable ones are available, and (2) Define custom roles inline when no predefined agent matches the project needs. The planner will automatically discover available agents and choose the best approach for each role.*
 
 ## Role Descriptions
 
-### Role: Data Analyst
-- Purpose: Interpret quantitative data and transform it into actionable insights.
-- Focus: Accuracy, clarity, measurable impact.
-- Style: Concise, structured, evidence-based.
+### Role: data-analyst
+- Agent Path: `.github/agents/05-data-ai/data-analyst.md`
 
-### Role: Copywriter
-- Purpose: Create clear, engaging, and persuasive text.
-- Focus: Tone, clarity, brand alignment, conversion.
-- Style: Friendly, readable, on-brand.
+### Role: Custom Marketing Specialist
+- Purpose: Create targeted marketing campaigns and analyze customer engagement metrics
+- Focus: Brand positioning, customer segmentation, conversion optimization, and multi-channel campaign management
+- Style: Creative yet analytical, customer-focused, results-driven
+- Note: Custom role defined inline (no matching predefined agent available)
 
-### Role: Software Architect
-- Purpose: Ensure sound, scalable, and maintainable system design.
-- Focus: Trade-offs, standards, reliability, long-term stability.
-- Style: Precise, technical, structured.
+### Role: backend-developer
+- Agent Path: `.github/agents/01-core-development/backend-developer.md`
 
 ## Tasks
 
-- [ ] [Data Analyst] Analyze the raw data sources and create a structured summary with key findings saved to `${OUTPUT_DIR}/data_summary.md`.
-- [ ] [Data Analyst] Read the data summary from `${OUTPUT_DIR}/data_summary.md` and extract the top 3 actionable insights.
-- [ ] [Copywriter] Review the insights and write user-friendly content optimized for clarity and engagement, saving it to `${OUTPUT_DIR}/final_content.md`.
-- [ ] [Software Architect] Evaluate technical requirements and create an implementation plan saved to `${OUTPUT_DIR}/tech_plan.txt`.
-- [ ] [Software Architect] Read the implementation plan from `${OUTPUT_DIR}/tech_plan.txt` and provide final recommendations.
+- [ ] [data-analyst] Analyze the raw data sources and create a structured summary with key findings saved to `${OUTPUT_DIR}/data_summary.md`.
+- [ ] [data-analyst] Read the data summary from `${OUTPUT_DIR}/data_summary.md` and extract the top 3 actionable insights.
+- [ ] [Custom Marketing Specialist] Review the insights and create targeted marketing recommendations, saving them to `${OUTPUT_DIR}/marketing_strategy.md`.
+- [ ] [backend-developer] Evaluate technical requirements and create an implementation plan saved to `${OUTPUT_DIR}/tech_plan.txt`.
+- [ ] [backend-developer] Read the implementation plan from `${OUTPUT_DIR}/tech_plan.txt` and provide final recommendations.

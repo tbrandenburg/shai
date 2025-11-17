@@ -88,9 +88,15 @@ fi
 
 PLAN_FILE="$OUTPUT_DIR/task_machine_plan.md"
 TEMPLATE_FILE="templates/task_machine_multirole.md"
+AGENTS_DIR=".github/agents"
 
 if [[ ! -f "$TEMPLATE_FILE" ]]; then
   echo "ERROR: Required task template '$TEMPLATE_FILE' not found."
+  exit 1
+fi
+
+if [[ ! -d "$AGENTS_DIR" ]]; then
+  echo "ERROR: Required agents directory '$AGENTS_DIR' not found."
   exit 1
 fi
 
@@ -126,18 +132,23 @@ You are the **TASK MACHINE PLANNER** in a two-stage pipeline.
 MANDATORY BEHAVIOR:
 - Before planning, scan the output directory at \`${OUTPUT_DIR}\` for any previously created artifacts so your plan builds on the latest work.
 - Use MCP tools to read both the user's high-level goal from \`${CONTEXT_FILE}\` and the multi-role task template stored at \`${TEMPLATE_FILE}\`.
+- RECURSIVELY explore the \`.github/agents\` folder structure to understand all available agent roles and their capabilities. Read agent definition files to understand their purpose, focus areas, and working styles.
 - Study the template's task patterns: how roles collaborate, file dependencies between tasks, and the structured workflow approach.
+- For each role needed:
+  * FIRST attempt to find a suitable existing agent in \`.github/agents\` that matches the required expertise
+  * If a good match exists, use ONLY the agent name and include its file path (e.g., \`Agent Path: .github/agents/05-data-ai/data-analyst.md\`) - do NOT redefine Purpose, Focus, or Style as these are already in the agent file
+  * If NO suitable agent exists, create a custom role definition inline with Purpose, Focus, and Style (add \`Note: Custom role defined inline\`)
 - Adapt the template's proven patterns to the user's request: use similar role collaboration, file handoffs, and task sequencing where applicable.
 - NEVER copy or quote any portion of the template verbatim in the plan. Summaries must be rephrased in your own words.
 - Produce a markdown document written to: \`${PLAN_FILE}\` with three sections: 
   1. \`## Context\` summarizing the overall objective.
-  2. \`## Role Descriptions\` distilling the purpose, focus and style for each role from the template, rewritten for this scenario.
+  2. \`## Role Descriptions\` listing each role (with "Agent Path" if using GitHub agent, or custom definition if not).
   3. \`## Chronologic Task List\` describing step-by-step tasks that follow the template's collaboration patterns.
-- Every task MUST be self-contained, independent, and formatted as: \`- [ ] [Role Name] Task name — clear, actionable instructions...\`
+- Every task MUST be self-contained, independent, and formatted as: \`- [ ] [role-name] Task name — clear, actionable instructions...\`
 - When adapting template tasks, maintain the file creation and reading patterns that enable role collaboration.
 - Include all details needed to execute each task without referencing other tasks.
 - Do NOT mark any task as completed.
-- Only adopt the roles and deliverables from the template that are genuinely relevant to the user's request; omit or simplify anything that would be unnecessary busywork.
+- Only adopt the roles and deliverables that are genuinely relevant to the user's request; omit or simplify anything that would be unnecessary busywork.
 - Keep the plan as lightweight as possible. If the user only wants a simple answer (e.g., a quick weather report), limit the plan to the fewest steps needed to fulfill that request rather than inventing elaborate multi-role workflows.
 - This workflow is UNSUPERVISED: do not ask questions or seek confirmation—make decisions yourself based solely on the provided task description and files.
 
@@ -176,7 +187,13 @@ MANDATORY BEHAVIOR:
 - Review the Context section to understand the overall objective.
 - Set your working directory to \`${OUTPUT_DIR}\` for all file operations.
 - Identify the FIRST unchecked task (first line containing \`- [ ]\`) and execute ONLY that task.
-- Before executing, adopt the role specified in brackets (e.g., [Data Analyst], [Developer]) and approach the task from that role's perspective, expertise, and working style.
+- BEFORE executing the task:
+  1. Extract the role name from the task (e.g., [data-analyst], [Custom Marketing Specialist])
+  2. Look up the role in the Role Descriptions section
+  3. If the role has an "Agent Path", read the complete agent definition file using MCP tools and adopt that agent's full expertise
+  4. If the role does not have an "Agent Path" use the Purpose, Focus, and Style from the plan's role description
+  5. Fully embody that role's expertise, focus areas, working style, and domain knowledge
+- Approach the task from that specific role's perspective, using their specialized skills and methodology.
 - After completing the task, update the same line to \`- [x]\` and add a summary as an indented sub-point using \`* Summary: ...\` format on the next line.
 - Do NOT alter other tasks except to add a short inline status note if strictly required by the executed task.
 - If execution reveals new subtasks, append them as new unchecked tasks immediately after the current line.
