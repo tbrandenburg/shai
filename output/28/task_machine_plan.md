@@ -1,0 +1,17 @@
+## Context
+The GitMCP initiative needs a corrected Claude Code MCP configuration that lists every requested tech-stack component (uv, FastAPI, React/Vite/ShadCN, etc.) with the proper `mcpServers` command format so Claude Code can launch each GitMCP endpoint. The team must rely on the prior issue conversation plus the GitMCP site to restate requirements, gather authoritative repository URLs, rebuild the configuration JSON, and document validation results.
+
+## Role Descriptions
+- **GitMCP Researcher**: Investigates GitMCP documentation and linked sources to capture every tool in scope, emphasizing accuracy, traceable citations, and tightly organized notes delivered in workspace files. Communicates in clear, bulleted statements with explicit gap tracking.
+- **Configuration Engineer**: Converts vetted research into a runnable Claude Code MCP configuration, ensuring the `mcpServers` schema, command/args fields, and descriptive comments match expectations. Prioritizes consistency, schema correctness, and pragmatic explanations for any deviations.
+- **Quality Reviewer**: Audits the finished configuration against both the requirement brief and repository catalog, confirming coverage and documenting any unresolved issues in a concise verification log. Focuses on reproducible checks, explicit pass/fail notes, and actionable follow-ups.
+
+## Chronologic Task List
+- [x] GitMCP Researcher Requirements brief — Read `output/28/issue_conversation.md` and https://gitmcp.io, then enumerate every stack component, expected deployment nuance, and open question in `output/28/stack_requirements.md`, using bullets plus citation-style links so downstream roles understand scope without rereading sources.
+  * Summary: Captured GitMCP context plus the full tech stack, deployment nuances, and open gaps with citations inside `output/28/stack_requirements.md` for downstream reuse.
+- [x] GitMCP Researcher Repository mapping — Analyze `output/28/stack_requirements.md` along with GitMCP and linked repos to produce a table in `output/28/repository_map.md` that lists each tool, its canonical GitMCP URL (or clearly labels gaps), and any authentication or CLI considerations needed by Claude Code.
+  * Summary: Documented every stack component in `repository_map.md` with gitmcp endpoints, CLI/auth notes, and gap flags for AWS Bedrock, Cloudflare R2, and OAuth/JWT.
+- [x] Configuration Engineer Rebuild Claude config — Read `output/28/stack_requirements.md` and `output/28/repository_map.md`, then regenerate `output/28/claude_code_mcp_config.json` so every entry appears under `mcpServers` with the `npx mcp-remote <gitmcp url>` pattern, adding structured comments when assumptions are made and verifying JSON validity.
+  * Summary: Produced `claude_code_mcp_config.json` with the full stack mapped to `npx mcp-remote` commands, embedding assumption notes for AWS Bedrock, Guardrails server, Cloudflare R2, and JSON-validated the result.
+- [x] Quality Reviewer Configuration audit — Compare `output/28/claude_code_mcp_config.json` to `output/28/stack_requirements.md`, `output/28/repository_map.md`, and `output/28/issue_conversation.md`, documenting verification steps, pass/fail results, and remaining risks in `output/28/review_log.md`, explicitly noting whether the original MCP format issue is resolved.
+  * Summary: Logged verification steps and residual risks in `output/28/review_log.md`, confirming coverage plus schema compliance and flagging the remaining guardrails/R2/Bedrock/auth assumptions.

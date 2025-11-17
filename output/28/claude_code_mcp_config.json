@@ -1,0 +1,221 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-resources/main/claude-code/mcpServers.schema.json",
+  "mcpServers": {
+    "uv": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/astral-sh/uv"],
+      "description": "Python package manager for bootstrapping environments",
+      "notes": ["Requires Node to run npx wrapper; uv itself handles Python installs"]
+    },
+    "pytest": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/pytest-dev/pytest"],
+      "description": "Python testing framework used with uv-managed envs",
+      "notes": ["No auth required"]
+    },
+    "jest": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/facebook/jest"],
+      "description": "Node-based unit testing for React/Vite stack",
+      "notes": ["Requires Node/npm availability"]
+    },
+    "fastapi": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/tiangolo/fastapi"],
+      "description": "Async Python backend framework",
+      "notes": ["Pairs with SQLAlchemy and OAuth components"]
+    },
+    "react": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/facebook/react"],
+      "description": "Frontend library for SPA/UI work",
+      "notes": ["Used with Vite + ShadCN"]
+    },
+    "vite": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/vitejs/vite"],
+      "description": "Frontend dev server and bundler",
+      "notes": ["Node 18+ recommended"]
+    },
+    "shadcn-ui": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/shadcn/ui"],
+      "description": "Component kit layered on React",
+      "notes": ["Focus on design tokens + CLI scaffolding"]
+    },
+    "pydantic-ai": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/pydantic/pydantic-ai"],
+      "description": "Agent scaffolding library",
+      "notes": ["No auth, pure Python"]
+    },
+    "openai-sdk": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/openai/openai-python"],
+      "description": "Official OpenAI Python SDK",
+      "notes": ["Requires OPENAI_API_KEY env var for live calls"]
+    },
+    "aws-bedrock-sdk": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/aws/aws-sdk-go-v2"],
+      "description": "AWS SDK v2 repo covering Bedrock service modules",
+      "notes": ["GitMCP lacks Bedrock-only repo; using aws-sdk-go-v2 which houses service/bedrock", "Document IAM creds + region requirements"]
+    },
+    "ollama": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/ollama/ollama"],
+      "description": "Local model runner",
+      "notes": ["GPU optional; no auth"]
+    },
+    "huggingface-transformers": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/huggingface/transformers"],
+      "description": "Model repository + pipelines",
+      "notes": ["Use HF token for private models"]
+    },
+    "mem0": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/mem0ai/mem0"],
+      "description": "Memory persistence layer",
+      "notes": ["Configure storage provider via env vars"]
+    },
+    "guardrails-sdk": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/guardrails-ai/guardrails"],
+      "description": "Guardrails validation SDK",
+      "notes": ["Primary repo also documents server deployment"]
+    },
+    "guardrails-server-docs": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/guardrails-ai/guardrails"],
+      "description": "Placeholder entry until docs mirror exists",
+      "notes": ["Docs live off GitHub; reusing SDK repo to keep MCP coverage", "Follow-up needed if official server repo published"]
+    },
+    "langfuse": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/langfuse/langfuse"],
+      "description": "Observability and tracing",
+      "notes": ["Requires LANGFUSE_PUBLIC_KEY/SECRET_KEY"]
+    },
+    "chatbot-ui": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/ChristophHandschuh/chatbot-ui"],
+      "description": "Reference chat UI",
+      "notes": ["Configure provider env vars in .env.local"]
+    },
+    "crawl4ai": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/unclecode/crawl4ai"],
+      "description": "Web crawler for ingestion",
+      "notes": ["Set PLAYWRIGHT_BROWSERS_PATH when needed"]
+    },
+    "docling": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/docling-project/docling"],
+      "description": "Document conversion toolkit",
+      "notes": ["Python dependencies include OCR libs"]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/supabase/supabase"],
+      "description": "Managed Postgres + platform",
+      "notes": ["Requires supabase login for managed services"]
+    },
+    "pgvector": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/supabase-community/pgvector"],
+      "description": "Vector extension for Postgres",
+      "notes": ["Needs superuser privileges to install"]
+    },
+    "minio": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/minio/minio"],
+      "description": "Local S3-compatible storage",
+      "notes": ["Access + secret keys required even locally"]
+    },
+    "cloudflare-r2": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/cloudflare/workers-sdk"],
+      "description": "Closest GitHub source documenting R2 APIs",
+      "notes": ["Docs live outside GitHub; using workers-sdk repo that contains R2 bindings", "API tokens + wrangler login required"]
+    },
+    "sqlalchemy": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/sqlalchemy/sqlalchemy"],
+      "description": "Python ORM",
+      "notes": ["No auth"]
+    },
+    "authlib": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/authlib/authlib"],
+      "description": "JWT/OAuth2 reference implementation",
+      "notes": ["Assumes FastAPI integration examples", "Configure secret keys + redirect URIs"]
+    },
+    "prometheus": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/prometheus/prometheus"],
+      "description": "Metrics collection",
+      "notes": ["No auth by default"]
+    },
+    "grafana": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/grafana/grafana"],
+      "description": "Observability dashboards",
+      "notes": ["Set GF_SECURITY_ADMIN_PASSWORD"]
+    },
+    "loki": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/grafana/loki"],
+      "description": "Log aggregation",
+      "notes": ["Requires object storage creds (MinIO/S3)"]
+    },
+    "sentry": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/getsentry/sentry"],
+      "description": "Error tracking platform",
+      "notes": ["Needs DSN + auth tokens"]
+    },
+    "docker-swarm": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/docker/swarmkit"],
+      "description": "Early orchestration target",
+      "notes": ["Nodes join via swarm join tokens"]
+    },
+    "kubernetes": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/kubernetes/kubernetes"],
+      "description": "Scaling orchestration platform",
+      "notes": ["Requires kubeconfig + cloud creds"]
+    },
+    "docker-engine": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/moby/moby"],
+      "description": "Container runtime for builds + deploys",
+      "notes": ["Docker CLI access needed"]
+    },
+    "nginx": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/nginx/nginx"],
+      "description": "Reverse proxy",
+      "notes": ["Requires root ports 80/443"]
+    },
+    "github-actions-runner": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/actions/runner"],
+      "description": "Self-hosted GH Actions runner",
+      "notes": ["Runner registration needs PAT/RUNNER_TOKEN"]
+    },
+    "ngrok": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/inconshreveable/ngrok"],
+      "description": "Local tunnel for publishing",
+      "notes": ["Requires ngrok auth token"]
+    },
+    "vercel": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/vercel/vercel"],
+      "description": "Cloud hosting platform",
+      "notes": ["Login via vercel CLI (OAuth or token)"]
+    }
+  }
+}

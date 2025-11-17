@@ -1,0 +1,41 @@
+# Stack Requirements — GitMCP Researcher Notes
+
+## GitMCP Behavior Expectations
+- GitMCP converts any public GitHub repository (or GitHub Pages site) into a Model Context Protocol (MCP) endpoint simply by swapping the domain to `gitmcp.io`, enabling Claude Code to execute `npx mcp-remote <gitmcp url>` for instant repo context. [gitmcp.io](https://gitmcp.io)
+- Claude Code requires each MCP entry to expose a `command` of `npx` plus `args` of `["mcp-remote", "https://gitmcp.io/<owner>/<repo>"]`, so every stack component with a GitHub repo must follow this pattern in the regenerated config. [issue_conversation.md](issue_conversation.md#L69-L83)
+
+## Stack Components & Deployment Nuances
+- Python package manager — **uv**: ensure MCP endpoint references the official GitHub repo powering uv so developers can scaffold Python environments quickly. [issue_conversation.md](issue_conversation.md#L11-L15)
+- Python tests — **pytest**: include repo for pytest so CLAude can load test helpers aligned with uv-managed envs. [issue_conversation.md](issue_conversation.md#L11-L15)
+- Node.js tests — **Jest**: map to Jest repo to cover frontend/unit work for React/Vite. [issue_conversation.md](issue_conversation.md#L12-L16)
+- Backend — **FastAPI**: MCP entry must expose backend service conventions (dependency injection, async patterns). [issue_conversation.md](issue_conversation.md#L14-L15)
+- Frontend — **React + Vite + ShadCN**: treat React app with Vite tooling and ShadCN UI kit as a single front-end surface that needs design tokens plus component docs. [issue_conversation.md](issue_conversation.md#L15-L16)
+- Agent framework — **pydantic-ai**: use gitmcp endpoint for `pydantic-ai` repo listed at https://ai.pydantic.dev/llms.txt to keep MCP aware of agent scaffolding. [issue_conversation.md](issue_conversation.md#L16-L17)
+- Model providers — **OpenAI** & **AWS Bedrock**: gather official repos/docs (if available) or flag CLI/auth requirements for API integration at the MCP layer. [issue_conversation.md](issue_conversation.md#L17-L18)
+- Self-hosted models — **ollama**: include repo describing local model serving expectations. [issue_conversation.md](issue_conversation.md#L18-L19)
+- Model repository — **HuggingFace**: represent huggingface/`huggingface` repo or docs to capture model download workflows. [issue_conversation.md](issue_conversation.md#L19-L20)
+- Long-term memory — **mem0**: connect to https://github.com/mem0ai/mem0 for memory persistence support. [issue_conversation.md](issue_conversation.md#L20-L21)
+- Guardrails — **guardrails-ai**: include GitHub source plus note that server docs (https://www.guardrailsai.com/docs/...) may lack a GitHub repo, requiring workaround. [issue_conversation.md](issue_conversation.md#L21-L23)
+- Observability — **LangFuse**: use gitmcp link derived from https://langfuse.com/llms.txt for tracing instrumentation. [issue_conversation.md](issue_conversation.md#L22-L23)
+- Chat UI — **chatbot-ui**: configure endpoint for https://github.com/ChristophHandschuh/chatbot-ui to capture client workflows. [issue_conversation.md](issue_conversation.md#L23-L24)
+- Web crawler — **crawl4ai**: map to https://github.com/unclecode/crawl4ai for ingestion flows. [issue_conversation.md](issue_conversation.md#L24-L25)
+- Document processing — **docling**: include docling project repo for conversion pipelines. [issue_conversation.md](issue_conversation.md#L25-L26)
+- Database — **PostgreSQL (Supabase)**: ensure MCP entry references Supabase GitHub repo(s) to capture Postgres + platform integration steps. [issue_conversation.md](issue_conversation.md#L26-L28)
+- Vector store — **PGVector (Supabase Vector)**: highlight the PGVector extension expectations on Supabase-managed Postgres. [issue_conversation.md](issue_conversation.md#L26-L28)
+- Storage — **MinIO (local)** → **Cloudflare R2 (prod)**: document dual-mode storage requirement so MCP config surfaces both repos. [issue_conversation.md](issue_conversation.md#L28-L29)
+- ORM — **SQLAlchemy**: include repo to align backend data models with PG + PGVector. [issue_conversation.md](issue_conversation.md#L29-L30)
+- Auth — **JWT / OAuth2**: cite reference implementation (e.g., Auth0 or FastAPI JWT example) for tokens; determine canonical repo. [issue_conversation.md](issue_conversation.md#L30-L31)
+- Monitoring — **Prometheus + Grafana**: add both repos to cover infra observability dashboards. [issue_conversation.md](issue_conversation.md#L31-L32)
+- Logging — **Loki**: ensure Loki repo is represented for log aggregation. [issue_conversation.md](issue_conversation.md#L32-L33)
+- Error tracking — **Sentry**: include Sentry OSS repo for telemetry instrumentation. [issue_conversation.md](issue_conversation.md#L33-L34)
+- Scaling — **Docker Swarm** (early) → **Kubernetes** (scale): capture both orchestrator repos/Docs to guide multi-phase deployments. [issue_conversation.md](issue_conversation.md#L34-L35)
+- Deployment — **Docker + Nginx + GitHub Actions**: represent each tool's repo because they coordinate packaging, reverse proxying, and CI/CD. [issue_conversation.md](issue_conversation.md#L35-L36)
+- Local publish — **ngrok**: include `inconshreveable/ngrok` or official repo to expose tunneling requirements. [issue_conversation.md](issue_conversation.md#L36-L37)
+- Cloud host — **Vercel**: map to Vercel repo/docset to capture hosting interface. [issue_conversation.md](issue_conversation.md#L37-L38)
+
+## Open Questions & Gaps
+- Guardrails server documentation link is not a GitHub repository, so confirm whether an alternate repo (e.g., `guardrails-ai/guardrails`) suffices or if a docs-only MCP endpoint is acceptable. [issue_conversation.md](issue_conversation.md#L21-L23)
+- AWS Bedrock may lack a canonical public GitHub repo; need to verify whether an official SDK repo (aws/aws-sdk) or documentation site is sanctioned for GitMCP use. [issue_conversation.md](issue_conversation.md#L17-L18)
+- OAuth2/JWT auth requirement lacks a single authoritative repo; determine whether FastAPI auth example, Auth0 quickstarts, or another GitHub project should drive MCP configuration. [issue_conversation.md](issue_conversation.md#L30-L31)
+- Dual storage (MinIO vs Cloudflare R2) and scaling (Docker Swarm vs Kubernetes) imply environment-specific configs; clarify whether separate MCP entries are needed per environment or if comments inside one entry can encode the transition. [issue_conversation.md](issue_conversation.md#L28-L35)
+- GitMCP covers GitHub-hosted repos; confirm strategy for services whose primary docs are outside GitHub (e.g., Cloudflare R2, Vercel), ensuring MCP endpoints point to relevant GitHub repos or identifying unsupported cases. [gitmcp.io](https://gitmcp.io)
