@@ -1,0 +1,392 @@
+{
+  "claudeCodeMcpConfig": {
+    "generatedAt": "2025-11-17",
+    "description": "Claude Code GitMCP endpoints covering the requested uv/FastAPI/React stack plus supporting tooling.",
+    "defaultAuth": {
+      "type": "none",
+      "notes": "All repositories are public GitHub resources exposed via gitmcp.io."
+    },
+    "servers": [
+      {
+        "id": "uv",
+        "category": "Package Mgmt",
+        "component": "uv",
+        "gitHubRepo": "https://github.com/astral-sh/uv",
+        "gitMcpUrl": "https://gitmcp.io/astral-sh/uv",
+        "auth": { "type": "none" },
+        "notes": "Astral's uv package manager for Python projects.",
+        "sources": ["repo_catalog.md#L7"]
+      },
+      {
+        "id": "pytest",
+        "category": "Testing",
+        "component": "pytest",
+        "gitHubRepo": "https://github.com/pytest-dev/pytest",
+        "gitMcpUrl": "https://gitmcp.io/pytest-dev/pytest",
+        "auth": { "type": "none" },
+        "notes": "Python testing runtime with fixtures and plugin ecosystem.",
+        "sources": ["repo_catalog.md#L8"]
+      },
+      {
+        "id": "jest",
+        "category": "Testing",
+        "component": "Jest",
+        "gitHubRepo": "https://github.com/jestjs/jest",
+        "gitMcpUrl": "https://gitmcp.io/jestjs/jest",
+        "auth": { "type": "none" },
+        "notes": "JavaScript test runner for Node + frontend stacks.",
+        "sources": ["repo_catalog.md#L9"]
+      },
+      {
+        "id": "fastapi",
+        "category": "Backend",
+        "component": "FastAPI",
+        "gitHubRepo": "https://github.com/tiangolo/fastapi",
+        "gitMcpUrl": "https://gitmcp.io/tiangolo/fastapi",
+        "auth": { "type": "none" },
+        "notes": "Official FastAPI framework reference implementation.",
+        "sources": ["repo_catalog.md#L10"]
+      },
+      {
+        "id": "react",
+        "category": "Frontend",
+        "component": "React",
+        "gitHubRepo": "https://github.com/facebook/react",
+        "gitMcpUrl": "https://gitmcp.io/facebook/react",
+        "auth": { "type": "none" },
+        "notes": "Meta's canonical React runtime and docs.",
+        "sources": ["repo_catalog.md#L11"]
+      },
+      {
+        "id": "vite",
+        "category": "Frontend",
+        "component": "Vite",
+        "gitHubRepo": "https://github.com/vitejs/vite",
+        "gitMcpUrl": "https://gitmcp.io/vitejs/vite",
+        "auth": { "type": "none" },
+        "notes": "Vite bundler for React + TS projects.",
+        "sources": ["repo_catalog.md#L12"]
+      },
+      {
+        "id": "shadcn",
+        "category": "Frontend",
+        "component": "ShadCN UI",
+        "gitHubRepo": "https://github.com/shadcn-ui/ui",
+        "gitMcpUrl": "https://gitmcp.io/shadcn-ui/ui",
+        "auth": { "type": "none" },
+        "notes": "Design system components layered on top of React.",
+        "sources": ["repo_catalog.md#L13"]
+      },
+      {
+        "id": "pydantic-ai",
+        "category": "Agent Framework",
+        "component": "pydantic-ai",
+        "gitHubRepo": "https://github.com/pydantic/pydantic-ai",
+        "gitMcpUrl": "https://gitmcp.io/pydantic/pydantic-ai",
+        "auth": { "type": "none" },
+        "notes": "Agent framework referenced in ai.pydantic.dev docs.",
+        "sources": ["repo_catalog.md#L14"]
+      },
+      {
+        "id": "openai",
+        "category": "Model Provider",
+        "component": "OpenAI",
+        "gitHubRepo": "https://github.com/openai/openai-python",
+        "gitMcpUrl": "https://gitmcp.io/openai/openai-python",
+        "auth": { "type": "none" },
+        "notes": "Python SDK capturing OpenAI API schema and policies.",
+        "sources": ["repo_catalog.md#L15"]
+      },
+      {
+        "id": "aws-bedrock",
+        "category": "Model Provider",
+        "component": "AWS Bedrock",
+        "gitHubRepo": "https://github.com/aws-samples/amazon-bedrock-samples",
+        "gitMcpUrl": "https://gitmcp.io/aws-samples/amazon-bedrock-samples",
+        "auth": { "type": "none" },
+        "notes": "Bedrock sample implementations for multi-model integrations.",
+        "sources": ["repo_catalog.md#L16"]
+      },
+      {
+        "id": "ollama",
+        "category": "Model Runtime",
+        "component": "ollama",
+        "gitHubRepo": "https://github.com/ollama/ollama",
+        "gitMcpUrl": "https://gitmcp.io/ollama/ollama",
+        "auth": { "type": "none" },
+        "notes": "Local LLM runtime for self-hosted inference.",
+        "sources": ["repo_catalog.md#L17"]
+      },
+      {
+        "id": "huggingface",
+        "category": "Model Hub",
+        "component": "HuggingFace Transformers",
+        "gitHubRepo": "https://github.com/huggingface/transformers",
+        "gitMcpUrl": "https://gitmcp.io/huggingface/transformers",
+        "auth": { "type": "none" },
+        "notes": "Transformer APIs and pretrained weights metadata.",
+        "sources": ["repo_catalog.md#L18"]
+      },
+      {
+        "id": "mem0",
+        "category": "Memory",
+        "component": "mem0",
+        "gitHubRepo": "https://github.com/mem0ai/mem0",
+        "gitMcpUrl": "https://gitmcp.io/mem0ai/mem0",
+        "auth": { "type": "none" },
+        "notes": "Conversation memory service.",
+        "sources": ["repo_catalog.md#L19"]
+      },
+      {
+        "id": "guardrails",
+        "category": "Guardrails",
+        "component": "guardrails-ai",
+        "gitHubRepo": "https://github.com/guardrails-ai/guardrails",
+        "gitMcpUrl": "https://gitmcp.io/guardrails-ai/guardrails",
+        "auth": { "type": "none" },
+        "notes": "LLM output guardrails execution environment.",
+        "sources": ["repo_catalog.md#L20"]
+      },
+      {
+        "id": "guardrails-docs",
+        "category": "Guardrails",
+        "component": "Guardrails Server Docs",
+        "gitHubRepo": null,
+        "gitMcpUrl": null,
+        "status": "unavailable",
+        "notes": "Docs hosted outside GitHub (https://www.guardrailsai.com/docs/getting_started/guardrails_server/) so no gitmcp.io endpoint; continue referencing vendor docs separately.",
+        "sources": ["repo_catalog.md#L21"]
+      },
+      {
+        "id": "langfuse",
+        "category": "Observability",
+        "component": "LangFuse",
+        "gitHubRepo": "https://github.com/langfuse/langfuse",
+        "gitMcpUrl": "https://gitmcp.io/langfuse/langfuse",
+        "auth": { "type": "none" },
+        "notes": "Telemetry + tracing platform for LLM apps.",
+        "sources": ["repo_catalog.md#L22"]
+      },
+      {
+        "id": "chatbot-ui",
+        "category": "Chat UI",
+        "component": "chatbot-ui",
+        "gitHubRepo": "https://github.com/ChristophHandschuh/chatbot-ui",
+        "gitMcpUrl": "https://gitmcp.io/ChristophHandschuh/chatbot-ui",
+        "auth": { "type": "none" },
+        "notes": "Reference chat interface shell.",
+        "sources": ["repo_catalog.md#L23"]
+      },
+      {
+        "id": "crawl4ai",
+        "category": "Web Crawler",
+        "component": "crawl4ai",
+        "gitHubRepo": "https://github.com/unclecode/crawl4ai",
+        "gitMcpUrl": "https://gitmcp.io/unclecode/crawl4ai",
+        "auth": { "type": "none" },
+        "notes": "Web data extraction pipeline.",
+        "sources": ["repo_catalog.md#L24"]
+      },
+      {
+        "id": "docling",
+        "category": "Document Processing",
+        "component": "docling",
+        "gitHubRepo": "https://github.com/docling-project/docling",
+        "gitMcpUrl": "https://gitmcp.io/docling-project/docling",
+        "auth": { "type": "none" },
+        "notes": "Document ingestion + parsing toolkit.",
+        "sources": ["repo_catalog.md#L25"]
+      },
+      {
+        "id": "supabase",
+        "category": "Database",
+        "component": "PostgreSQL (Supabase)",
+        "gitHubRepo": "https://github.com/supabase/supabase",
+        "gitMcpUrl": "https://gitmcp.io/supabase/supabase",
+        "auth": { "type": "none" },
+        "notes": "Supabase monorepo representing managed Postgres platform.",
+        "sources": ["repo_catalog.md#L26"]
+      },
+      {
+        "id": "pgvector",
+        "category": "Vector Store",
+        "component": "PGVector (Supabase Vector)",
+        "gitHubRepo": "https://github.com/supabase-community/pgvector",
+        "gitMcpUrl": "https://gitmcp.io/supabase-community/pgvector",
+        "auth": { "type": "none" },
+        "notes": "PG extension enabling vector similarity search.",
+        "sources": ["repo_catalog.md#L27"]
+      },
+      {
+        "id": "minio",
+        "category": "Storage",
+        "component": "MinIO",
+        "gitHubRepo": "https://github.com/minio/minio",
+        "gitMcpUrl": "https://gitmcp.io/minio/minio",
+        "auth": { "type": "none" },
+        "notes": "Local S3-compatible storage baseline.",
+        "sources": ["repo_catalog.md#L28"]
+      },
+      {
+        "id": "cloudflare-r2",
+        "category": "Storage",
+        "component": "Cloudflare R2",
+        "gitHubRepo": "https://github.com/cloudflare/r2-examples",
+        "gitMcpUrl": "https://gitmcp.io/cloudflare/r2-examples",
+        "auth": { "type": "none" },
+        "notes": "Sample projects covering production R2 usage.",
+        "sources": ["repo_catalog.md#L29"]
+      },
+      {
+        "id": "sqlalchemy",
+        "category": "ORM",
+        "component": "SQLAlchemy",
+        "gitHubRepo": "https://github.com/sqlalchemy/sqlalchemy",
+        "gitMcpUrl": "https://gitmcp.io/sqlalchemy/sqlalchemy",
+        "auth": { "type": "none" },
+        "notes": "ORM bridging FastAPI with Postgres.",
+        "sources": ["repo_catalog.md#L30"]
+      },
+      {
+        "id": "jwt",
+        "category": "Auth",
+        "component": "JWT (PyJWT)",
+        "gitHubRepo": "https://github.com/jpadilla/pyjwt",
+        "gitMcpUrl": "https://gitmcp.io/jpadilla/pyjwt",
+        "auth": { "type": "none" },
+        "notes": "Token signing/verification reference implementation.",
+        "sources": ["repo_catalog.md#L31"]
+      },
+      {
+        "id": "oauth2",
+        "category": "Auth",
+        "component": "OAuthlib",
+        "gitHubRepo": "https://github.com/oauthlib/oauthlib",
+        "gitMcpUrl": "https://gitmcp.io/oauthlib/oauthlib",
+        "auth": { "type": "none" },
+        "notes": "OAuth2 helpers for FastAPI and Auth flows.",
+        "sources": ["repo_catalog.md#L32"]
+      },
+      {
+        "id": "prometheus",
+        "category": "Monitoring",
+        "component": "Prometheus",
+        "gitHubRepo": "https://github.com/prometheus/prometheus",
+        "gitMcpUrl": "https://gitmcp.io/prometheus/prometheus",
+        "auth": { "type": "none" },
+        "notes": "Metrics scraping + alerting base.",
+        "sources": ["repo_catalog.md#L33"]
+      },
+      {
+        "id": "grafana",
+        "category": "Monitoring",
+        "component": "Grafana",
+        "gitHubRepo": "https://github.com/grafana/grafana",
+        "gitMcpUrl": "https://gitmcp.io/grafana/grafana",
+        "auth": { "type": "none" },
+        "notes": "Dashboards layered on Prometheus metrics.",
+        "sources": ["repo_catalog.md#L34"]
+      },
+      {
+        "id": "loki",
+        "category": "Logging",
+        "component": "Loki",
+        "gitHubRepo": "https://github.com/grafana/loki",
+        "gitMcpUrl": "https://gitmcp.io/grafana/loki",
+        "auth": { "type": "none" },
+        "notes": "Centralized log aggregation.",
+        "sources": ["repo_catalog.md#L35"]
+      },
+      {
+        "id": "sentry",
+        "category": "Error Tracking",
+        "component": "Sentry",
+        "gitHubRepo": "https://github.com/getsentry/sentry",
+        "gitMcpUrl": "https://gitmcp.io/getsentry/sentry",
+        "auth": { "type": "none" },
+        "notes": "Self-hosted error tracking stack.",
+        "sources": ["repo_catalog.md#L36"]
+      },
+      {
+        "id": "docker-swarm",
+        "category": "Orchestration",
+        "component": "Docker Swarm (Moby)",
+        "gitHubRepo": "https://github.com/moby/moby",
+        "gitMcpUrl": "https://gitmcp.io/moby/moby",
+        "auth": { "type": "none" },
+        "notes": "Swarm clustering capability lives inside the upstream Docker engine.",
+        "sources": ["repo_catalog.md#L37"]
+      },
+      {
+        "id": "kubernetes",
+        "category": "Orchestration",
+        "component": "Kubernetes",
+        "gitHubRepo": "https://github.com/kubernetes/kubernetes",
+        "gitMcpUrl": "https://gitmcp.io/kubernetes/kubernetes",
+        "auth": { "type": "none" },
+        "notes": "Production scale orchestration platform.",
+        "sources": ["repo_catalog.md#L38"]
+      },
+      {
+        "id": "docker",
+        "category": "Deployment",
+        "component": "Docker CLI",
+        "gitHubRepo": "https://github.com/docker/cli",
+        "gitMcpUrl": "https://gitmcp.io/docker/cli",
+        "auth": { "type": "none" },
+        "notes": "CLI + config for image build and push flows.",
+        "sources": ["repo_catalog.md#L39"]
+      },
+      {
+        "id": "nginx",
+        "category": "Deployment",
+        "component": "Nginx",
+        "gitHubRepo": "https://github.com/nginx/nginx",
+        "gitMcpUrl": "https://gitmcp.io/nginx/nginx",
+        "auth": { "type": "none" },
+        "notes": "Reverse proxy / load balancer for FastAPI + React.",
+        "sources": ["repo_catalog.md#L40"]
+      },
+      {
+        "id": "github-actions",
+        "category": "Deployment",
+        "component": "GitHub Actions",
+        "gitHubRepo": "https://github.com/actions/toolkit",
+        "gitMcpUrl": "https://gitmcp.io/actions/toolkit",
+        "auth": { "type": "none" },
+        "notes": "Toolkit powering CI/CD workflows.",
+        "sources": ["repo_catalog.md#L41"]
+      },
+      {
+        "id": "ngrok",
+        "category": "Publish",
+        "component": "ngrok",
+        "gitHubRepo": "https://github.com/ngrok/ngrok-python",
+        "gitMcpUrl": "https://gitmcp.io/ngrok/ngrok-python",
+        "auth": { "type": "none" },
+        "notes": "Local tunnel client for exposing dev services.",
+        "sources": ["repo_catalog.md#L42"]
+      },
+      {
+        "id": "vercel",
+        "category": "Cloud",
+        "component": "Vercel",
+        "gitHubRepo": "https://github.com/vercel/vercel",
+        "gitMcpUrl": "https://gitmcp.io/vercel/vercel",
+        "auth": { "type": "none" },
+        "notes": "Cloud deployment platform for frontend/backend.",
+        "sources": ["repo_catalog.md#L43"]
+      }
+    ],
+    "validation": {
+      "sourceFiles": [
+        "output/28/research_notes.md",
+        "output/28/repo_catalog.md",
+        "output/28/issue_conversation.md"
+      ],
+      "openQuestions": [
+        "Guardrails server docs lack GitHub repo; cannot expose via gitmcp.io and must stay a manual reference."
+      ]
+    }
+  }
+}
