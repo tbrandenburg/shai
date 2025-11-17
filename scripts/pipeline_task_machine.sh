@@ -114,26 +114,6 @@ require_file() {
 
 rm -f "$PLAN_FILE"
 
-# Summarize any existing artifacts (other than the plan file) for planner context
-ARTIFACT_SUMMARY=$'  - None found'
-if [[ -d "$OUTPUT_DIR" ]]; then
-  mapfile -t _artifact_entries < <(find "$OUTPUT_DIR" \
-    -mindepth 1 -maxdepth 1 \
-    ! -name "$(basename "$PLAN_FILE")" \
-    -printf '%P|%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort || true)
-  if [[ ${#_artifact_entries[@]} -gt 0 ]]; then
-    ARTIFACT_SUMMARY=""
-    for entry in "${_artifact_entries[@]}"; do
-      name="${entry%%|*}"
-      timestamp="${entry#*|}"
-      entry_line=$(printf '  - %s (last modified %s)\n' "$name" "$timestamp")
-      ARTIFACT_SUMMARY+="$entry_line"
-    done
-  fi
-fi
-unset _artifact_entries
-ARTIFACT_SUMMARY+=$'\n'
-
 #############################################
 # STEP 1 — PLANNER
 #############################################
@@ -144,7 +124,7 @@ read -r -d '' PLANNER_PROMPT <<EOF || true
 You are the **TASK MACHINE PLANNER** in a two-stage pipeline.
 
 MANDATORY BEHAVIOR:
-- Before planning, scan the output directory at \`${OUTPUT_DIR}\` for any previously created artifacts so your plan builds on the latest work. Refer to the summary below and open any useful files directly.
+- Before planning, scan the output directory at \`${OUTPUT_DIR}\` for any previously created artifacts so your plan builds on the latest work.
 - Use MCP tools to read both the user's high-level goal from \`${CONTEXT_FILE}\` and the multi-role task template stored at \`${TEMPLATE_FILE}\`.
 - Study the template's task patterns: how roles collaborate, file dependencies between tasks, and the structured workflow approach.
 - Adapt the template's proven patterns to the user's request: use similar role collaboration, file handoffs, and task sequencing where applicable.
@@ -164,8 +144,6 @@ MANDATORY BEHAVIOR:
 TASK:
 Create the plan for the request described in the context file stored at \`${CONTEXT_FILE}\`.
 
-Existing artifacts already present in \`${OUTPUT_DIR}\`:
-${ARTIFACT_SUMMARY}
 EOF
 
 opencode run "$PLANNER_PROMPT"
