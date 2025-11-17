@@ -153,6 +153,35 @@ echo "Review & Quality Check produced: ${FINAL_OUTPUT}"
 echo ""
 
 #############################################
+# STAGE 5 — PDF Generation
+#############################################
+
+echo "Generating PDFs from markdown files..."
+
+# Check if pandoc is available
+if ! command -v pandoc &> /dev/null; then
+  echo "WARNING: pandoc not found. Skipping PDF generation."
+  echo "Install pandoc to enable PDF output: apt-get install pandoc texlive-xetex"
+else
+  PANDOC_OPTS="--pdf-engine=xelatex -V geometry:margin=0.75in -V mainfont=\"DejaVu Sans\" -V monofont=\"DejaVu Sans Mono\" -V fontsize=10pt -V linestretch=1.15 -V papersize=a4"
+  
+  # Generate PDFs for each markdown file
+  for md_file in "$INTAKE_OUTPUT" "$TECHNICAL_OUTPUT" "$QUOTE_OUTPUT" "$FINAL_OUTPUT"; do
+    if [[ -f "$md_file" ]]; then
+      pdf_file="${md_file%.md}.pdf"
+      echo "Converting $md_file to PDF..."
+      if pandoc "$md_file" -o "$pdf_file" $PANDOC_OPTS 2>/dev/null; then
+        echo "  ✓ Created: $pdf_file"
+      else
+        echo "  ✗ Failed to create PDF for $md_file"
+      fi
+    fi
+  done
+  
+  echo ""
+fi
+
+#############################################
 # DONE
 #############################################
 
@@ -162,3 +191,12 @@ echo "  $INTAKE_OUTPUT"
 echo "  $TECHNICAL_OUTPUT"
 echo "  $QUOTE_OUTPUT"
 echo "  $FINAL_OUTPUT"
+
+if command -v pandoc &> /dev/null; then
+  echo ""
+  echo "PDF files:"
+  echo "  ${INTAKE_OUTPUT%.md}.pdf"
+  echo "  ${TECHNICAL_OUTPUT%.md}.pdf"
+  echo "  ${QUOTE_OUTPUT%.md}.pdf"
+  echo "  ${FINAL_OUTPUT%.md}.pdf"
+fi
