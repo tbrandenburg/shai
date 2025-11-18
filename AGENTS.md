@@ -16,7 +16,7 @@ Input File → Agent Process → Output File
 - Each agent writes **required output files**
 - Each agent is called via `opencode run "..."`
 - Output files are mandatory and verified before proceeding
-- All outputs go to the `output/` directory
+- All outputs go to a context-specific subdirectory inside `output/`
 
 ## 🔍 Agent Guidelines
 
@@ -37,6 +37,7 @@ Input File → Agent Process → Output File
 - Always write to the specified output path
 - Include proper markdown formatting for documents
 - Ensure files are created before finishing the task
+- Keep every file for a task inside `output/[CONTEXT]/` (where `CONTEXT` is the issue ID, task name, or app name)
 
 ## 🛠 Running Agents
 
@@ -88,6 +89,7 @@ All agents MUST:
 3. **Write Output** - Use MCP tools to create the specified output file
 4. **Verify** - Confirm the output file was created before finishing
 5. **Fail Fast** - Exit with error if output file cannot be created
+6. **Stay in Context** - Work from the relevant `output/[CONTEXT]/` directory for the entire task
 
 ### 🚫 Forbidden Actions
 
