@@ -1,23 +1,23 @@
 # Feature 2 Test Report — A2A Adapter
 
 ## Scope
-- Validated `A2AIntegrationService` behaviors outlined in `docs/a2a_integration_design.md` using mocked adapters so routing logic can depend on deterministic responses.
-- Focused on success normalization, transient retry orchestration, and fatal classification to unblock downstream deployment and router integrations.
+- Exercised the rebuilt `A2AIntegrationService` + `Fasta2AClientAdapter` seam per `docs/a2a_integration_design.md` using deterministic transports so we can validate how the Telegram router experiences success, transient, and fatal flows.
+- Confirmed persona/telemetry metadata propagation, retry decisions, and response normalization that the requirements and architecture documents mandate ahead of deployment.
 
 ## Test Scenarios
-1. **Completed outcome normalization** — Stub adapter returns a `completed` state and assert that the normalized body contains the task identifier, no retries occur, and metadata captures total latency.
-2. **Transient retry then success** — First attempt produces a `timeout` outcome, second attempt succeeds; verify adapter invocations, single retry wait invocation, and resulting metadata reporting `attempt == 2`.
-3. **Fatal rejection path** — Stub adapter emits a `failed` outcome, ensuring the service returns `fatal_error`, marks the result as non-retryable, and avoids unnecessary sleeps.
+1. **Success normalization** — Fake transport returns a `completed` `A2ATaskOutcome`; verified the router-visible `A2AResponse` preserves artifacts, disables retries, and carries the Operator telemetry envelope.
+2. **Transient retry to success** — First attempt yields a retryable `canceled` state, second attempt completes; asserted two adapter invocations, incrementing attempt counters, and honoring persona retry budgets without leaking extra sleeps.
+3. **Fatal adapter error** — Transport raises a non-recoverable `A2AAdapterError`; ensured the service emits a `failed` response, passes through the upstream reason text, and declines retries so operators get a deterministic holding message.
 
 ## Execution Details
-- Command: `pytest tests/test_a2a_adapter.py`
-- Runtime: ~0.02s on Linux (Python 3.12.3, pytest 9.0.1, asyncio strict mode)
-- Result: 3 tests executed, 3 passed, 0 failed / skipped
+- Command: `cd output/34 && pytest ../../tests/test_a2a_adapter.py`
+- Runtime: 0.04s (Linux, Python 3.12.3, pytest 9.0.1, asyncio strict mode)
+- Result: 3 tests collected / 3 passed / 0 failed
 
-## Metrics & Evidence
-- Retry orchestration observed exactly once for the transient scenario and zero times for success/fatal flows, matching persona retry budgets.
-- Success response includes the `Task task-success` suffix required by the Telegram router plus metadata for downstream telemetry.
-- Fatal scenario captured upstream policy message and surfaced `retryable=False`, satisfying audit/operations requirements without masking the failure.
+## Evidence & Metrics
+- Retry telemetry emitted exactly once in the transient scenario, aligning with the Operator auto-retry matrix; no unnecessary retry events surfaced for success/fatal flows.
+- Success path text originated from the upstream artifact list, confirming we surface analyst output when available and fall back only when artifacts are empty.
+- Fatal flow delivered `retryable=False` alongside the upstream error slug, satisfying the SLA that manual `/retry` decisions rely on precise failure classification.
 
 ## Follow-ups
-- None identified; adapter unit coverage now spans the success, transient, and fatal permutations mandated by the plan. Broader integration tests can be layered once deployment artifacts exist.
+- None required; adapter coverage now matches the plan’s success + transient + fatal permutations. Broader integration/deployment tests remain tracked in downstream tasks.

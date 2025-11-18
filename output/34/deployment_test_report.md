@@ -1,24 +1,33 @@
 # Deployment Smoke Test Report — Telegram Router
 
 ## Scope
-- Validate that `ops/uv_start.sh` loads repo-provided environment variables and rejects missing config before launching.
-- Confirm the standalone health server path returns an `ok` payload when configuration succeeds, proving readiness probes wired in `docs/deployment_design.md` operate end-to-end.
+- Exercise `ops/uv_start.sh` with the repo-provided `.env.example` template to ensure configuration guards still execute before the router boots.
+- Attempt to reach the `/healthz` probe advertised in the deployment design while documenting the present failure mode when placeholder Telegram credentials prevent a ready response.
 
 ## Test Asset
-- Script: `tests/smoke/test_deployment.sh` (new) driven by the test-automator agent, modeled on the deployment runbook.
-- Inputs: `.env.example` (cloned into a temporary smoke `.env`) plus the shared ops scripts referenced by the deployment design.
-- Tooling stack: `uv 0.9.10`, Python 3.12.3, curl 8.5.0, Bash 5.2. All binaries executed locally inside the repo workspace.
+- Script: `tests/smoke/test_deployment.sh` (authored by the test-automator role). It clones `.env.example`, strips conflicting keys, injects smoke overrides (persona map, OTEL header blanking, health host/port, config hash, etc.), and then launches the router through `ops/uv_start.sh` while tailing logs and polling `/healthz`.
+- Tooling: `uv 0.9.10`, Python 3.12.3, curl 8.5.0, Bash 5.2. The script enforces `curl` availability and streams router logs to a temporary file for debugging before cleanup.
 
 ## Execution Details
-1. The smoke harness duplicates `.env.example`, appends deterministic overrides (SERVICE_ENV=smoke, CONFIG_MANIFEST_ID=smoke-test, HEALTHZ_PORT=18080, TELEGRAM_ACTIVE_POLLER=false, A2A_LOOPBACK=true, and a regex-compliant TELEGRAM token/chat ID) so no production secrets are touched.
-2. `ops/uv_start.sh --env-file <temp> --skip-lock --skip-compile check` executes first; the loader logs `sha256=55d154fb983f1ca86cd5e5a56605892144c27b29c7a70a3fa6d56f089282d5fc` for traceability and emits `CONFIG_VALIDATION_OK`, demonstrating the config gate passes even when the `uv` binary is absent (Python fallback kicks in automatically).
-3. The script backgrounds `ops/uv_start.sh --env-file <temp> --skip-lock --skip-compile health-server`, captures `HEALTH_SERVER_PID=16856`, and polls `http://127.0.0.1:18080/healthz` until the JSON payload reports `status == "ok"`.
-4. Command (from `output/34`): `../../tests/smoke/test_deployment.sh` (≈4s). Health logs stream into `/tmp/telegram_router_smoke_health.log` during execution and are deleted unless `KEEP_HEALTH_LOG=1` is set.
+1. From `output/34`, ran `../../tests/smoke/test_deployment.sh`. The harness installs `uv` (once) so `ops/uv_start.sh` can resolve project dependencies.
+2. The script duplicates `.env.example`, removes the original `ROUTER_*`, `TELEGRAM_PERSONA_MAP`, and `OTEL_EXPORTER_OTLP_HEADERS` entries, and rewrites them with smoke-safe values (`ROUTER_ENV=smoke`, `ROUTER_HEALTH_PORT=18080`, `TELEGRAM_PERSONA_MAP=123456789:operator`, `OTEL_EXPORTER_OTLP_HEADERS=`) to avoid parser errors while keeping the rest of the template intact.
+3. `ops/uv_start.sh local --env-file <temp> --log-format json --log-level DEBUG` is spawned in the background; the script polls `http://127.0.0.1:18080/healthz` every 2 s (30 attempts ≈ 60 s) while verifying the router process is still alive.
+4. Result: The router never reached a ready state because the stock `.env.example` token is unauthorized. Telegram returned HTTP 401, propagating a `SecurityError`. `/healthz` therefore never responded 200, the smoke harness timed out after 60 s, and it surfaced the tail of the router log for diagnosis.
 
 ## Evidence
-- `CONFIG_VALIDATION_OK` (stdout) — proves the ops gate accepted the synthetic env file; the full trace lives in `/tmp/telegram_router_smoke_check.log` while the run is active.
-- `HEALTH_SERVER_PID=16856` — background server tracked for cleanup, matching the PID recorded in the console output.
-- `HEALTHZ_OK {"status": "ok", "service_env": "smoke", "config_manifest_id": "smoke-test", "env_sha256": "55d154fb983f1ca86cd5e5a56605892144c27b29c7a70a3fa6d56f089282d5fc", "timestamp": "2025-11-18T16:25:20Z"}` — confirms the readiness probe contract returns JSON once config validation succeeds.
+- Command: ``cd output/34 && ../../tests/smoke/test_deployment.sh``
+- Excerpt:
+  ```
+  Launching router via ops/uv_start.sh
+  Router PID: 12314
+  Waiting for http://127.0.0.1:18080/healthz
+  Timed out waiting for health endpoint. Recent log:
+      raise SecurityError(f"telegram 4xx: {exc.code} body={body}") from exc
+  SecurityError: telegram 4xx: 401 body={"ok":false,"error_code":401,"description":"Unauthorized"}
+  health.tick
+  ```
+- Exit status: **FAIL** (expected until a Telegram sandbox token or mock transport is available so `/healthz` can flip to ready).
 
 ## Follow-ups
-- None required. Script can be wired into CI/CD to guard deployment artifacts by invoking the same entrypoints as staging/production supervisors.
+- Provide sandbox Telegram credentials or a local fake Telegram transport so the smoke run can complete without external dependencies.
+- Implement the documented `/healthz` HTTP responder (none exists in the current codebase) or relax the probe to report degraded status even when Telegram auth fails, enabling automated verification hooks to observe readiness more deterministically.
