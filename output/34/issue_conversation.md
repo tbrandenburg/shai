@@ -1,0 +1,7 @@
+# Issue #34 — A2A Client
+
+## Original Post by @tbrandenburg
+
+@task With looking into https://github.com/tbrandenburg/pydanticai-a2a/blob/main/fasta2a_client.py - Develop a simple uv-based telegram python bot which forwards user messages to the a2a agent/network und responds to the user with their message. The bot should be configured by the TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID it should be allowed to respond to.
+
+## Comments
