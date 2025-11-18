@@ -4,6 +4,7 @@
 - Issue #34 context and conversation (`output/34/issue_conversation.md`) requesting a uv-based Telegram bot that proxies prompts to the upstream `fasta2a_client.py` agent and returns results to the authorized chat.
 - Feature 1 deliverables: routing requirements (`output/34/feature1_requirements.md`), architecture notes (`output/34/feature1_architecture.md`), backend design (`docs/telegram_routing_design.md`), and implemented bot (`bots/telegram_router.py`).
 - Upstream reference implementation (`pydanticai-a2a` repo) where `fasta2a_client.py` constructs an `A2AClient`, issues `send_message` calls, and polls task status via HTTPX (`run_client.py`).
+- Current upstream script snapshot (`https://raw.githubusercontent.com/tbrandenburg/pydanticai-a2a/main/fasta2a_client.py`, fetched 2025-11-18) confirming final state names (`completed`, `failed`, `canceled`, `rejected`) and the exact Message/TextPart schema leveraged by `A2AClient`.
 
 ## Business Objective
 Enable the Telegram router to invoke the external A2A agent/network through the upstream `fasta2a_client.py` wrapper with auditable metadata, deterministic retries, and confidentiality controls so that operators can rely on consistent, low-latency responses without exposing secrets or unsanitized prompts.
@@ -49,6 +50,17 @@ Enable the Telegram router to invoke the external A2A agent/network through the 
 
 Treat these three tags as the canonical `A2A_ALLOWED_PROMPT_TAGS` default. Reject or translate any other persona labels before dispatch so upstream guardrails stay deterministic.
 
+### Persona Tagging & Routing Rules
+- The router determines persona tags using the Feature 1 persona table (Operators, On-Call, Automation Auditor) and persists the tag beside the Telegram user ID hash before invoking A2A. Missing or conflicting inputs cause the adapter to block dispatch and return a "persona_unmapped" error.
+- Each outgoing request includes both the canonical tag and a duty status (e.g., `{ "persona":"Operator", "duty_status":"primary" }`). Duty status is derived from the same on-call schedule file already referenced by Feature 1 acceptance metrics.
+- Persona tags decide retry policy: Operator prompts can trigger automatic retries, On-Call prompts trigger a single retry, and AutomationAuditor prompts never retry automatically (to avoid repeated compliance queries).
+- Responses echo persona tags back to Telegram with the A2A task ID so that downstream transcripts remain aligned with audit personas.
+
+### Metadata Envelope Structure
+- **Message-level metadata (`Message.metadata`)** — Must include `correlation_id`, `chat_id`, `user`, `received_at`, `telemetry`, `compliance_tags`, `persona_context`, and `trace` structures outlined in the table above. Append `envelope_version` (start at `1`) so downstream services can evolve schema safely.
+- **Part-level metadata (`TextPart.metadata`)** — Embed `persona_tag`, `prompt_checksum`, `redaction_rules`, and per-part language/format hints (e.g., `{ "content_type":"text/plain","language":"en" }`). The adapter enforces parity between part metadata and message metadata for `correlation_id` and `message_id` to keep audit trails intact.
+- **Server echo metadata** — On receipt, normalize upstream `status.message`, `attempt_count`, and latency ms into the response metadata block that `RouterCore` sends back to Telegram. Store the latest metadata in the in-memory conversation window for Operator replay commands.
+
 ## Adapter Configuration Inputs
 
 | Variable | Requirement | Notes |
@@ -62,10 +74,12 @@ Treat these three tags as the canonical `A2A_ALLOWED_PROMPT_TAGS` default. Rejec
 | `A2A_RETRY_BACKOFF_SECONDS` | Default 2s base, multiplier 2x, max 8s. | Aligns with router retry settings for consistent observability. |
 | `A2A_ALLOWED_PROMPT_TAGS` | Enumerated string list (e.g., `{"Operator","OnCall"}`). | Used to validate persona metadata before dispatch. |
  
-## Authentication Model Confirmation
-- The upstream reference agent defined in `server_simple.py`/`server_mcp.py` (tbrandenburg/pydanticai-a2a) and the distributed `fasta2a_client.py` both instantiate `A2AClient(base_url="http://localhost:7000")` without any API credentials, confirming that the current deployment relies on network isolation rather than request-level tokens.
-- Treat `A2A_API_KEY` as optional: when unset, omit Authorization headers entirely and depend on Telegram chat gating plus VPC egress controls for security.
-- Maintain an upgrade path by wiring the adapter to accept a bearer/API key header using the `a2a-sdk` `AuthInterceptor` scheme (per https://a2a-protocol.org/latest/sdk/python/api/a2a.client). Once secrets are issued, the same env var can toggle credentialed calls without code edits.
+## Authentication & Access Control Rules
+1. **Transport defaults** — The upstream reference agent defined in `server_simple.py`/`server_mcp.py` (tbrandenburg/pydanticai-a2a) and the distributed `fasta2a_client.py` both instantiate `A2AClient(base_url="http://localhost:7000")` without API credentials. Production deployments MUST override the base URL to `https://` endpoints and fail-fast if a non-TLS origin is configured outside dev sandboxes.
+2. **Secret sourcing** — `A2A_API_KEY` (and future client secrets) are injected only through the secrets manager backing the uv deployment. The adapter loads them at process start, stores only in memory, never echoes in logs/metrics, and exposes a fingerprinted hash solely for auditing. Missing secrets keep the client in network-gated mode without crashing.
+3. **Header injection** — When `A2A_API_KEY` is present, the adapter MUST attach `Authorization: Bearer <token>` to every `send_message` and `get_task` call by registering the `a2a-sdk` `AuthInterceptor`. This logic lives alongside `fasta2a_client.py` so Feature 1 routing code remains unchanged.
+4. **Rotation & revocation** — Secrets rotate at least every 60 days (or immediately during incidents). The adapter checks an optional `A2A_API_KEY_ISSUED_AT` timestamp to alert operators once secrets approach expiry and to stop startup when the value is older than 90 days.
+5. **Future credentials** — Maintain an upgrade path for mutual TLS or request signing by reserving config fields (`A2A_CLIENT_CERT_PATH`, `A2A_HMAC_SECRET`). The adapter must validate that at least one authentication mechanism is configured before promoting to production; otherwise flag the deployment as "reduced trust" in health reports.
 
 ## Retry & Resiliency Requirements
 
@@ -76,12 +90,26 @@ Treat these three tags as the canonical `A2A_ALLOWED_PROMPT_TAGS` default. Rejec
 - Total wall-clock budget per prompt (Telegram receive → Telegram reply) must remain ≤ 12s P95; abort A2A polling early if hitting this SLA so operators can re-issue prompts.
 - Always return partial metadata even on failure so downstream tasks (architecture + backend) can reason about follow-up behavior.
 
+## Latency & SLA Expectations
+| Stage | Budget | Enforcement |
+| --- | --- | --- |
+| Telegram intake + sanitization | ≤200 ms | RouterCore timestamps update receipt and sanitization completion. |
+| Adapter dispatch (`send_message`) | ≤500 ms median, 1s P95 | Capture HTTPX timing metrics from `fasta2a_client.py` instrumentation. |
+| Polling window (`get_task` loop) | ≤2s median, 8s P95, hard 10s ceiling unless timeout override specified | `A2A_POLL_INTERVAL_SECONDS` + `A2A_MAX_POLLS` must be tuned so the loop cannot exceed 10s without raising `transient_error`. |
+| Response normalization + Telegram reply | ≤1s | Includes formatting, metadata merge, and Telegram send call. |
+
+- End-to-end SLO remains ≤2s median and ≤4s P95 under nominal load (matching Feature 1 acceptance metrics). When upstream latency trends beyond 4s P95 for ten minutes, raise a warning in metrics and annotate the Telegram status command output.
+- If A2A has not returned a terminal state by 10s, the adapter returns a holding reply (`"A2A still running"`) with the task ID and continues polling in the background up to the 12s overall SLA before canceling.
+- Log `a2a.latency_ms` histograms alongside persona tags to detect whether certain personas (e.g., AutomationAuditor) are routinely slower.
+
 ## Confidentiality & Data Handling
 - Only sanitized prompt text (post-router sanitization) is ever sent to `fasta2a_client.py`; redact TELEGRAM tokens, chat IDs, or other secrets from payload and logs.
-- Mask usernames in structured logs using hashed surrogate while still passing cleartext to A2A (required for auditing but never logged).
-- Ensure `fasta2a_client.py` stores no local transcripts; responses remain in-memory and forwarded immediately back to Telegram.
-- Restrict outbound network egress to Telegram + configured `A2A_BASE_URL`; log attempts to reach any other host.
-- Apply least-privilege principle to API keys by scoping to read/write prompts only; rotate secrets quarterly or upon incident.
+- Mask usernames in structured logs using hashed surrogates while still passing cleartext to A2A. The hash algorithm (SHA-256 + salt) and salt rotation cadence must be documented so auditors can recompute identities when authorized.
+- Encrypt every adapter-to-A2A hop in transit (TLS 1.2+) and rely on the existing uv runtime disk encryption for any temporary artifacts. No plaintext payloads may be written to `/tmp` or swap.
+- Ensure `fasta2a_client.py` stores no local transcripts; responses remain in-memory and forwarded immediately back to Telegram. The adapter purges any cached `current_task` dictionaries once replies are delivered or retries exhausted.
+- Restrict outbound network egress to Telegram + configured `A2A_BASE_URL`; log attempts to reach any other host and block the request. Health checks verify egress ACLs at startup.
+- Apply least-privilege principle to API keys by scoping to read/write prompts only; rotate secrets quarterly or upon incident and notify operators if the key age exceeds the defined policy.
+- Preserve persona tags, compliance tags, and metadata envelopes for 30 days inside the observability sink only; Telegram history remains the durable record. Any exported audit package must omit prompt text and instead include hashes plus metadata to honor confidentiality commitments.
 
 ## Observability & Metrics
 - Emit structured log events `a2a.request`, `a2a.response`, and `a2a.failure` with correlation IDs, persona tags, latency_ms, attempt counts, and upstream status.

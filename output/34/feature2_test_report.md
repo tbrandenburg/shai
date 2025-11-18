@@ -1,24 +1,23 @@
 # Feature 2 Test Report — A2A Adapter
 
 ## Scope
-- Validated the async A2A integration layer (`A2AIntegrationService`) per `docs/a2a_integration_design.md` with focus on telemetry, retry logic, and fatal error handling.
-- Exercised adapter entry points through isolated pytest cases that mock the upstream network boundary via stub dispatchers, ensuring no external calls.
+- Validated `A2AIntegrationService` behaviors outlined in `docs/a2a_integration_design.md` using mocked adapters so routing logic can depend on deterministic responses.
+- Focused on success normalization, transient retry orchestration, and fatal classification to unblock downstream deployment and router integrations.
 
 ## Test Scenarios
-1. **Success path telemetry** — Verified that a successful adapter response preserves persona metadata and emits both `a2a.request` and `a2a.response` telemetry events before returning the normalized payload.
-2. **Transient failure with retries** — Simulated repeated transient errors to ensure retry attempts honor limits, emit telemetry for each attempt, and return a `transient_error` result with `attempt_count` metadata after exhaustion.
-3. **Fatal error propagation** — Forced a `fatal_error` adapter response to confirm immediate `A2AIntegrationError` raising plus telemetry classification as `fatal`.
+1. **Completed outcome normalization** — Stub adapter returns a `completed` state and assert that the normalized body contains the task identifier, no retries occur, and metadata captures total latency.
+2. **Transient retry then success** — First attempt produces a `timeout` outcome, second attempt succeeds; verify adapter invocations, single retry wait invocation, and resulting metadata reporting `attempt == 2`.
+3. **Fatal rejection path** — Stub adapter emits a `failed` outcome, ensuring the service returns `fatal_error`, marks the result as non-retryable, and avoids unnecessary sleeps.
 
 ## Execution Details
 - Command: `pytest tests/test_a2a_adapter.py`
-- Runtime: ~0.02s on Linux Python 3.12.3 (pytest 9.0.1, asyncio strict mode)
-- Result: 3 tests, 3 passed, 0 failed/xfail/skipped
+- Runtime: ~0.02s on Linux (Python 3.12.3, pytest 9.0.1, asyncio strict mode)
+- Result: 3 tests executed, 3 passed, 0 failed / skipped
 
 ## Metrics & Evidence
-- Coverage emphasis: success, transient retry, and fatal control-flow branches (adapter dispatch mocked, telemetry captured for assertions).
-- Telemetry verification: request/response/failure payload counts asserted per scenario.
-- Retry verification: `attempt_count == 2` confirmed when retry limit exhausted, jitter mocked to avoid nondeterministic sleeps.
-- Failure propagation: `A2AIntegrationError` captured with fatal classification, ensuring RouterCore callers can differentiate retries vs. hard stops.
+- Retry orchestration observed exactly once for the transient scenario and zero times for success/fatal flows, matching persona retry budgets.
+- Success response includes the `Task task-success` suffix required by the Telegram router plus metadata for downstream telemetry.
+- Fatal scenario captured upstream policy message and surfaced `retryable=False`, satisfying audit/operations requirements without masking the failure.
 
 ## Follow-ups
-- None identified; adapter logic behaves as designed for the covered permutations. Broader integration tests can be added once deployment assets exist.
+- None identified; adapter unit coverage now spans the success, transient, and fatal permutations mandated by the plan. Broader integration tests can be layered once deployment artifacts exist.

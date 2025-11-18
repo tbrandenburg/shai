@@ -1,80 +1,117 @@
 # Feature 1 — Telegram Routing Architecture
 
 ## 1. Architectural Overview
-- **Objective:** Route authorized Telegram chat messages through the uv-managed Python bot to the upstream `fasta2a_client.py`, then return responses to the originating chat with strict authorization and observability guarantees.
-- **Execution Context:** Service starts via `uv run bots/telegram_router.py`, which initializes an `asyncio` event loop (uv bundles Python + deps) and supervises all async tasks.
+- **Objective:** Route authorized Telegram chat messages through a uv-managed Python bot, forward sanitized payloads to the upstream `fasta2a_client.py`, and return responses to the originating chat while preserving strict authorization, auditability, and latency targets.
+- **Execution Context:** Operators invoke `uv run bots/telegram_router.py`. uv bundles the Python runtime, installs dependencies, and supervises an `asyncio` loop plus structured logging/metrics exporters so the bot behaves identically across laptops, CI, and deployment hosts.
 - **Key Components:**
-  1. **Startup & Configuration Guard** — loads/validates `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, optional rate-limit + retry knobs; fails-fast with structured errors if invalid.
-  2. **Telegram Transport Task** — maintains long-polling connection to Telegram `getUpdates` API, pushes sanitized updates onto an internal queue with correlation IDs.
-  3. **Message Router Task** — enforces authorization, performs validation pipeline, and orchestrates the call chain to the A2A adapter.
-  4. **A2A Client Bridge** — async wrapper around `fasta2a_client.py` that executes prompts and returns structured responses + metadata.
-  5. **Reply Dispatcher** — formats success/error payloads and posts replies to the same Telegram chat, honoring Markdown escaping and chunking rules.
+  1. **Startup & Configuration Guard** — loads/validates `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, rate-limit knobs, and retry policies; fails fast with redacted errors if invalid.
+  2. **Transport Adapter** — encapsulates the Telegram update mechanism (long polling now, webhook-ready later) and pushes normalized updates onto an internal queue with correlation IDs.
+  3. **Routing & Validation Pipeline** — enforces chat/user authorization, sanitizes content, and checks rate-limit/queueing constraints before invoking upstream services.
+  4. **A2A Client Bridge** — async façade over `fasta2a_client.py` that carries persona metadata, correlation IDs, and timeout budgets into the upstream workflow.
+  5. **Reply Dispatcher** — formats success/error payloads, splits >4096-char replies, and posts results back to Telegram while appending reference metadata.
 
-## 2. uv Event Loop Structure
+## 2. uv Event Loop Topology
 | Stage | Responsibility | Concurrency Notes |
 | --- | --- | --- |
-| `main()` | Bootstraps env, logging, graceful shutdown hooks | Runs synchronously until loop starts |
-| `poll_updates_task` | Performs Telegram long-polling with backoff, pushes `TelegramUpdate` objects into `asyncio.Queue` | Runs forever; restarts on HTTP 5xx/timeout |
-| `router_task` | Consumes queue, filters by `TELEGRAM_CHAT_ID`, normalizes text, and fans out to processing coroutines | Uses bounded semaphore to cap concurrent A2A calls |
-| `a2a_call_task` | Wraps `fasta2a_client.py` call within `asyncio.to_thread` (if sync) or direct await (if async) | Emits latency metrics + retries based on policy |
-| `reply_task` | Sends formatted Telegram replies, splits >4096 chars, attaches correlation ID | Retries send failures with exponential backoff |
+| `main()` | Bootstraps env validation, logging config, health probes, and graceful shutdown hooks | Runs synchronously until loop starts |
+| `poll_updates_task` | Maintains Telegram `getUpdates` long-poll with `timeout=30`, limited to `message` updates | Restarted on HTTP 5xx/timeout with capped exponential backoff |
+| `router_task` | Consumes normalized updates, verifies chat/user, deduplicates via update and correlation IDs | Runs under bounded queue (default depth 25) to mirror conversation window |
+| `persona_rate_gate` | Token-bucket calculator keyed by Telegram user ID + persona | Executes inline; saturates at 6 prompts/min/user |
+| `a2a_call_task` | Wraps `fasta2a_client.py` invocation via awaited coroutine or `asyncio.to_thread` | Guarded by semaphore (`max_inflight=1` hard limit for this release) with FIFO wait list |
+| `reply_task` | Sends Telegram replies, chunking >4096char and adding MarkdownV2 escaping, correlation IDs, latency stats | Retries failed sends with jittered exponential backoff |
+| `health_tick_task` | Periodic env/secret age validation plus `/healthz` heartbeat message (optional) | Can be disabled in dev; surfaces rotation SLAs |
 
-**Control Flow:**
-1. `uv run` starts `asyncio` loop.
-2. `poll_updates_task` awaits `getUpdates(timeout=30, allowed_updates=['message'])` and enqueues updates.
-3. `router_task` dequeues, checks chat/user authorization, deduplicates messages via update IDs, and dispatches `a2a_call_task` workers under concurrency limits (default 2).
-4. Each worker awaits the A2A response, annotates metadata (duration, status), and hands off to `reply_task`.
-5. Structured log + metrics reporters run as background callbacks publishing to stdout/json for ingestion.
+**Control Flow:** `uv run` starts the `asyncio` loop, spawns the tasks above, and centralizes structured logging so each stage emits consistent telemetry. Shutdown signals drain queues, wait for `a2a_call_task` completion (with timeout), notify Telegram that the bot is pausing, and terminate uv cleanly.
 
-## 3. Webhook vs Polling Decision
+## 3. Transport Strategy (Webhook vs Long Polling)
 | Option | Pros | Cons |
 | --- | --- | --- |
-| **Webhook** | Lowest message latency; Telegram pushes updates instantly; easier horizontal scaling with load balancer | Requires public HTTPS endpoint + certificate; complicates uv deployment; needs ingress + firewall coordination |
-| **Long Polling (Chosen)** | Works from private outbound-only environments; no TLS termination needed; resilient to short outages via retry; aligns with single-instance uv CLI deployments | Slightly higher latency (<1s) vs webhooks; single instance handles all traffic |
+| **Webhook** | Sub-second delivery, Telegram pushes updates instantly, trivial horizontal scaling with a load balancer | Requires public HTTPS endpoint + certificate, introduces ingress/firewall approvals, complicates uv-only deployments |
+| **Long Polling (Chosen)** | Works from outbound-only hosts, no TLS termination to manage, easy to run from operator laptops or single-process uv services, resilient to intermittent outages | Slight latency penalty (<1 s) vs webhooks, single instance handles all throughput |
 
-**Rationale:** Current scope targets a single authorized chat inside constrained infra where opening inbound ports or provisioning TLS certs would add significant lead time. Long polling keeps deployment self-contained while still meeting <2s latency and 99.5% delivery targets. Architecture remains webhook-ready by abstracting the transport layer, enabling later swap without touching router logic.
+**Decision Drivers:** Requirements target a single authorized chat, outbound-only networking, and rapid recovery. Long polling keeps the deployment self-contained yet still satisfies the ≤2 s P50 latency requirement. The transport layer is abstracted behind the **Transport Adapter**, so migrating to webhooks later only swaps this component without touching validation or A2A logic. Configuration flags (`TELEGRAM_WEBHOOK_URL`, `TELEGRAM_POLL_TIMEOUT`) remain stubbed for future releases.
 
-## 4. Message Validation & Authorization Pipeline
-1. **Environment Verification (startup & health):** Ensure `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` loaded; emit fatal log + exit if missing.
-2. **Update Sanity:** Reject non-text updates (stickers, media) with informative reply; log for audit.
-3. **Chat Authorization:** Compare `update.message.chat.id` to configured chat ID; if mismatch, log `security.denied` event and optionally send denial message.
-4. **User Tagging:** Capture `from.id`, username, display name; attach to log context for traceability.
+## 4. Validation & Authorization Pipelines
+1. **Environment Verification:** On startup and every `health_tick_task`, verify `TELEGRAM_BOT_TOKEN` matches `^\d+:[A-Za-z0-9_-]{35,}$` and that `TELEGRAM_CHAT_ID` is populated. Fail-fast if missing, and surface a redacted error plus rotation age telemetry.
+2. **Update Sanity:** Reject non-text updates (stickers, media, attachments). The router replies with a friendly denial, logs `event=media_rejected`, and records hashed user/chat IDs.
+3. **Chat Authorization:** Compare `update.message.chat.id` to the configured `TELEGRAM_CHAT_ID`. Mismatches trigger `SECURITY_DENIED` logs, hashed identifiers, and optional denial replies. No A2A forwarding occurs.
+4. **User & Persona Tagging:** Map Telegram user IDs to personas (Operator, On-call, future Auditor) based on allowlists defined in configuration. Persona drives rate-limit buckets and command privileges (`/status`, `/flush`).
 5. **Content Validation:**
-   - Trim whitespace, enforce configurable max length.
-   - Strip/escape MarkdownV2 to prevent formatting injection.
-   - Reject empty or command-only payloads with usage hint.
-   - Optionally parse `/status`, `/retry` commands for operational controls.
-6. **Rate & Flood Control:** Apply token-bucket per user/chat to prevent upstream saturation (default 5 requests / 30s, burst 2).
-7. **Correlation ID Assignment:** Generate ULID per request, embed in log, Telegram reply, and A2A call metadata.
-8. **A2A Request Envelope:** Wrap sanitized text plus correlation ID, persona tag, and timestamp before invoking `fasta2a_client.py`.
-9. **Response Validation:** Ensure A2A output conforms to expected schema (text, optional attachments). On schema mismatch, surface fallback error message + log detail.
+   - Trim whitespace, collapse newlines, and enforce the 2,000-character cap (pre-forward). Replies include a truncation notice if needed.
+   - Escape MarkdownV2 characters, strip HTML, and sanitize secrets via regex denylist before hitting A2A.
+   - Parse router commands; commands bypass A2A and hit internal handlers.
+6. **Correlation & Traceability:** Generate ULID correlation IDs, attach persona tags, Telegram user hash, and queue position to every structured log, metrics emission, and A2A envelope.
 
-## 5. Error Handling & Resilience
-- **Telegram Transport Faults:** Distinguish client (4xx) vs server (5xx) failures; exponential backoff up to 60s; emit health metric `telegram.transport`.
-- **Authorization Violations:** No forwarding occurs; log structured security event with hashed IDs; optional operator alert if repeated.
-- **A2A Failures:** Up to 1 retry for transient errors (<2s). On exhaustion, reply with error template containing correlation ID, instructing operator to retry later.
-- **Configuration Drift:** Background task periodically re-validates env + network connectivity; on failure toggles a circuit breaker to pause intake while alerting operators.
-- **Graceful Shutdown:** Signal handlers drain queues, complete in-flight A2A calls (with timeout), and post "bot paused" message to Telegram.
+## 5. Rate Limiting, Queueing & Flow Control
+- **Per-user token bucket:** 6 prompts/minute/user with burst of 2. Violations increment throttling counters, trigger exponential backoff notices, and emit metrics `rate_limit.hit` to confirm ≤1% throttling target.
+- **Single in-flight guard:** `asyncio.Semaphore(1)` ensures only one prompt is processed by A2A at a time, honoring the upstream synchronous polling constraint. Additional prompts remain queued.
+- **Queue discipline:** `asyncio.Queue(maxsize=25)` mirrors the conversation history window. When full, the router rejects new prompts with `HTTP 429`-style messaging and instructs operators to wait.
+- **Busy notifications:** If a prompt enters the wait queue, the bot replies immediately with `router busy (position N)` including the correlation ID so operators know their request status.
+- **Retry/backoff orchestration:** After 3 consecutive throttles or queue drops, the router enforces exponential backoff (base 5 s, cap 60 s) and surfaces a `/help` hint. Operators can issue `/status` to view queue depth and current job metadata.
 
-## 6. Observability & Logging
-- **Structured Logging:** JSON logs with fields `{timestamp, level, correlation_id, chat_id, user_id, event, latency_ms, status}`.
-- **Metrics Hooks:** Counters for messages processed/denied/error, histograms for A2A latency, gauges for queue depth.
-- **Tracing:** Optional OpenTelemetry spans around Telegram fetch + A2A call for distributed tracing compatibility.
-- **Audit Trail:** All authorization decisions and A2A outcomes stored via append-only log pipeline (stdout -> collector) to support future Automation Auditor persona.
+## 6. External A2A Touchpoints
+- **Adapter Boundary:** The router calls an internal adapter module (`services/a2a_adapter.py`, to be delivered in Feature 2) that wraps `fasta2a_client.py`. Until then, the router interacts directly with `fasta2a_client.py` through an awaitable `invoke(prompt, metadata)` shim living under `bots/adapters/a2a_bridge.py`.
+- **Invocation Contract:**
+  - **Inputs:** `{prompt, persona, correlation_id, telegram_user_id_hash, timestamps}`.
+  - **Timeout:** Default 12 s upstream SLA; configurable via `A2A_TIMEOUT_SECONDS`. The adapter enforces retries for transient statuses flagged by the upstream client.
+  - **Outputs:** Structured object `{status, text, attachments?, task_id, diagnostics}`. The router validates schema compliance before replying to Telegram.
+- **Error Surface:** Fatal adapter errors bubble up as structured exceptions carrying `retryable` metadata so the router can decide between retry, failure message, or operator escalation.
+- **Observability Bridge:** Adapter emits latency histograms and success/error counters into the shared telemetry layer so P50/P95 metrics in the requirements remain auditable.
 
-## 7. Sequence Diagram
+## 7. Error Handling & Resilience
+- **Transport Faults:** Distinguish Telegram client (4xx) vs server (5xx) failures. 4xx trigger operator-visible alerts; 5xx cause exponential backoff up to 60 s with jitter.
+- **Authorization Violations:** Never forwarded; emit structured security log plus optional `/security` alert when repeated attempts exceed threshold.
+- **A2A Failures:** One retry for transient states (network timeout, 5xx). On exhaustion, reply with actionable error template referencing correlation ID and last upstream status.
+- **Configuration Drift:** Background `health_tick_task` revalidates env and network connectivity. Failures flip a circuit breaker that pauses queue intake and posts a pinned Telegram status message.
+- **Graceful Shutdown:** Signal handlers drain queues, finish in-flight work (respecting timeout), send "bot paused" notice with reason, and exit uv with zero status for process managers.
+
+## 8. Observability & Telemetry
+- **Structured Logging:** JSON logs with `{timestamp, level, correlation_id, chat_id_hash, user_id_hash, persona, event, latency_ms, queue_depth, status}` ensuring 100% trace coverage.
+- **Metrics:**
+  - Counters — messages processed/denied/error, rate-limit hits, busy-queue rejects.
+  - Histograms — Telegram → A2A round-trip latency, adapter invocation latency, queue wait duration.
+  - Gauges — queue depth, semaphore occupancy, token-bucket remaining capacity.
+- **Tracing:** Optional OpenTelemetry spans wrap Telegram fetch + A2A calls, enabling distributed traces once exporters are wired.
+- **Audit Trail:** Logs stream to stdout → collector; hashed identifiers satisfy confidentiality while enabling the Automation Auditor persona’s future work.
+
+## 9. Sequence Diagrams
+
+### 9.1 Authorized Prompt (Happy Path)
 ```mermaid
 sequenceDiagram
-    participant Chat as Telegram Chat
+    participant Chat as Telegram Chat (authorized)
     participant Bot as uv Telegram Router
-    participant A2A as fasta2a_client
+    participant Rate as Rate/Queue Guards
+    participant A2A as fasta2a_client Adapter
 
-    Chat->>Bot: Message (update)
-    Bot->>Bot: Validate chat/user + sanitize
-    Bot->>A2A: Async request (correlation ID)
-    A2A-->>Bot: Structured response / error
-    Bot-->>Chat: Reply with result + metadata
-    Bot-->>Bot: Log + metrics emit
+    Chat->>Bot: Message update
+    Bot->>Bot: Validate env + chat/user + sanitize
+    Bot->>Rate: Check token bucket & queue position
+    Rate-->>Bot: Allowed (position 0)
+    Bot->>A2A: invoke(prompt, metadata, correlation_id)
+    A2A-->>Bot: Structured response + task_id
+    Bot-->>Chat: Reply with formatted result + correlation_id
+    Bot-->>Bot: Emit logs/metrics/traces
 ```
 
-This architecture primes the backend developer to implement modular components (transport adapter, router, A2A bridge) with clear contracts, while satisfying the security, latency, and observability requirements captured in Feature 1.
+### 9.2 Unauthorized or Busy Flow
+```mermaid
+sequenceDiagram
+    participant Chat as Telegram Chat (unauthorized or burst)
+    participant Bot as Router Validation Layer
+    participant Queue as Queue/Semaphore Guard
+
+    Chat->>Bot: Message update
+    Bot->>Bot: Check chat/user + payload size
+    alt Unauthorized Chat
+        Bot-->>Chat: Deny + audit reference
+        Bot-->>Bot: Log SECURITY_DENIED with hashed IDs
+    else Queue Saturated
+        Bot->>Queue: Attempt enqueue (max 25)
+        Queue-->>Bot: Rejected (max depth reached)
+        Bot-->>Chat: Busy response + suggested wait/backoff
+        Bot-->>Bot: Log queue_overflow metric
+    end
+```
+
+This refreshed architecture codifies the uv topology, transport stance, validation and rate-limit mechanics, plus the upstream A2A integration boundary so downstream design and implementation work can proceed deterministically.

@@ -1,31 +1,54 @@
 # Feature 2 — A2A Integration Architecture
 
 ## 1. Architectural Intent
-- **Goal:** Extend the Telegram router with a deterministic adapter that invokes the upstream `fasta2a_client.py` (A2A network) using rich metadata, strict timeout controls, and auditable responses.
-- **Constraints:** Router operates inside a uv-managed single-process deployment with outbound-only egress. All calls must remain non-blocking to preserve <12s P95 Telegram round-trip latency.
-- **Approach:** Encapsulate the upstream client behind an `A2AIntegrationService` boundary that accepts sanitized `RouterCommand` payloads, enriches them with the required metadata envelope, orchestrates polling + retries, and returns normalized `A2AResult` objects.
+- **Objective** — Provide a deterministic adapter between `RouterCore` and the upstream `fasta2a_client.py` so that Telegram prompts reach the A2A network with full metadata, strict SLAs, and auditable results.
+- **Operating model** — All work runs inside the uv event loop. Blocking sections of `fasta2a_client.py` execute in `asyncio.to_thread` so Router latency budgets (<12s P95) remain intact.
+- **Design lens** — API-first contract separating orchestration (`A2AIntegrationService`) from transport (`Fasta2AClientAdapter`) so downstream developers, testers, and ops can replace or simulate each layer independently.
 
 ## 2. Service Boundaries & Responsibilities
 | Boundary | Responsibilities | Inputs | Outputs |
 | --- | --- | --- | --- |
-| `RouterCore` (existing) | Authorize Telegram traffic, sanitize prompt text, derive persona tags, and hand off requests to A2A service along with `correlation_id`. | `RouterCommand` | `A2AResult` or raised `A2AIntegrationError` |
-| `A2AIntegrationService` (new orchestrator) | Enforce persona & configuration validation, transform request into upstream schema, drive polling loop, enforce timeout SLA, emit metrics/logs. | `RouterCommand`, env config, observability handles | `A2AResult` (success/transient/fatal) |
-| `Fasta2AClientAdapter` (wrapper around `fasta2a_client.py`) | Translate high-level message envelope into `A2AClient` calls, abstract sync/async boundary via `asyncio.to_thread`, surface structured errors. | `A2AEnvelopedRequest` | `A2ATaskHandle`, `A2ATaskState` |
-| Upstream `A2AClient` | Execute task lifecycle (send message, poll task) against external service. | Message payload, base URL, optional API key | Task status objects, artifacts |
-| Telemetry Sink | Collect structured logs/metrics for SLA tracking. | Enriched telemetry events | Stored traces, counters |
+| `RouterCore` | Authorize Telegram traffic, sanitize prompt text, determine persona tags/duty status, and call A2A integration with a `RouterCommand`. | `RouterCommand`, rate-limit + SLA context | `A2AResult` or raised `A2AIntegrationError` |
+| `A2AIntegrationService` | Validate persona/configuration, enrich metadata envelope, enforce retries/timeouts, emit telemetry, and normalize upstream responses. | `RouterCommand`, config struct, observability handles | `A2AResult`, structured error events |
+| `MetadataComposer` (subcomponent) | Generate `A2AEnvelopedRequest`, compute checksum, merge compliance + telemetry tags. | `RouterCommand`, persona registry | `A2AEnvelopedRequest` |
+| `DispatchController` (subcomponent) | Invoke adapter, manage polling state machine, enforce SLA guard. | Enveloped request, timers | `A2ATaskOutcome`, retry signals |
+| `Fasta2AClientAdapter` | Wrap `fasta2a_client.py`, inject auth headers, translate envelope to upstream `Message/TextPart`. | `A2AEnvelopedRequest`, env config | `A2ATaskHandle`, `A2ATaskState`, normalized artifacts |
+| Upstream `A2AClient` | Execute `send_message` + `get_task` requests against remote agent. | HTTP requests | Task states, artifacts, server metadata |
+| Telemetry Sink | Persist `a2a.request/response/failure` logs, counters, and histograms. | Structured log payloads | Metrics dashboards, alerts |
 
 ## 3. Interface Contracts
 
-### 3.1 Request Envelope (`A2AEnvelopedRequest`)
+### 3.1 Router → Integration Boundary
+```python
+class A2AIntegrationService(Protocol):
+    async def execute(self, command: RouterCommand) -> A2AResult: ...
+
+@dataclass
+class RouterCommand:
+    correlation_id: str
+    chat_id: str
+    user: str
+    persona_tag: Literal["Operator", "OnCall", "AutomationAuditor"]
+    duty_status: Literal["primary", "secondary"]
+    sanitized_text: str
+    received_at: datetime
+    telemetry: dict
+    compliance_tags: dict
+    redaction_rules: list[str]
+```
+`execute()` guarantees idempotency through `correlation_id` and returns a normalized `A2AResult` (see §3.4). Errors raise `A2AIntegrationError` with `classification`, `attempt_count`, and `metadata` fields.
+
+### 3.2 Metadata Envelope
 ```yaml
 A2AEnvelopedRequest:
-  correlation_id: string (ULID `tg-<update_id>`)
-  message_id: uuid
+  correlation_id: string (ULID)
+  message_id: uuid4
   chat_id: string
-  user: string (cleartext for upstream, hashed surrogate used in logs)
-  persona_tag: enum[Operator, OnCall, AutomationAuditor]
-  received_at: datetime (ISO-8601)
-  prompt_checksum: string (sha256)
+  user: string
+  persona_tag: enum (Operator, OnCall, AutomationAuditor)
+  duty_status: enum (primary, secondary)
+  received_at: datetime
+  prompt_checksum: sha256 string
   telemetry:
     source: "telegram_router"
     version: semver
@@ -36,116 +59,134 @@ A2AEnvelopedRequest:
   trace:
     queue_depth: int
     semaphore_slots: int
-  sanitized_text: string (Markdown stripped)
+  sanitized_text: string
 ```
+The `MetadataComposer` maps this envelope to the upstream schema, duplicating correlation/message IDs inside both `Message.metadata` and each `TextPart.metadata` block for traceability.
 
-`A2AIntegrationService` produces this schema before invoking `Fasta2AClientAdapter.run(enveloped_request)`.
-
-### 3.2 Upstream Message Mapping
+### 3.3 Adapter Contract
 ```python
-message = Message(
-    role="user",
-    kind="message",
-    message_id=request.message_id,
-    parts=[
-        TextPart(
-            text=request.sanitized_text,
-            kind="text",
-            metadata={
-                "correlation_id": request.correlation_id,
-                "persona_tag": request.persona_tag,
-                "prompt_checksum": request.prompt_checksum,
-                "chat_id": request.chat_id,
-                "user": request.user,
-                "received_at": request.received_at,
-                "telemetry": request.telemetry,
-                "compliance_tags": request.compliance_tags,
-                "redaction_rules": request.redaction_rules,
-                "trace": request.trace,
-            },
-        )
-    ],
-    metadata={
-        "persona_context": request.persona_context,
-        "persona_tag": request.persona_tag,
-        "correlation_id": request.correlation_id,
-    },
-)
-```
+class Fasta2AClientAdapter(Protocol):
+    async def run(self, request: A2AEnvelopedRequest) -> A2ATaskOutcome: ...
 
-### 3.3 Normalized Response (`A2AResult`)
+@dataclass
+class A2ATaskOutcome:
+    task_id: str
+    final_state: Literal["completed", "failed", "canceled", "rejected", "timeout"]
+    attempt_count: int
+    latency_ms: int
+    artifacts: list[str]
+    server_messages: list[str]
+```
+The adapter injects `Authorization: Bearer <A2A_API_KEY>` when configured, enforces HTTPS-only `A2A_BASE_URL` outside dev sandboxes, and encapsulates polling inside its own executor thread. Any exception is wrapped in `A2AAdapterError` carrying `recoverable: bool` to guide retry decisions by the service.
+
+### 3.4 Normalized Response
 ```yaml
 A2AResult:
   status: enum[success, transient_error, fatal_error]
   body: string (UTF-8)
   metadata:
+    correlation_id: string
     task_id: string
-    final_state: enum[completed, failed, canceled, rejected, timeout]
+    final_state: string
     attempt_count: int
     upstream_latency_ms: int
     persona_tag: string
     server_messages: [string]
-    correlation_id: string
 ```
-`Fasta2AClientAdapter` ensures artifacts >1 text result are concatenated with double newline separators; unexpected binary artifacts trigger quarantine + warning note referencing storage pointer.
+Binary or multi-artifact responses are collapsed into text with warnings referencing the quarantine location to preserve confidentiality promises.
 
-## 4. Timeout, Polling, and Retry Strategy
-| Control | Default | Behavior |
-| --- | --- | --- |
-| `A2A_POLL_INTERVAL_SECONDS` | 2s | `A2AIntegrationService` awaits between `get_task` calls; jitter ±200ms to avoid synchronized bursts. |
-| `A2A_POLL_TIMEOUT_SECONDS` | 30s | Hard ceiling per attempt; hitting this surfaces `transient_error` with hint to retry. |
-| `A2A_MAX_POLLS` | Derived (`timeout / interval`) | Prevents infinite loops; if limit reached first, treat as timeout. |
-| `A2A_RETRY_LIMIT` | 1 | Applies only to transient classifications (timeouts, HTTP 5xx, canceled state, decoding issues). |
-| `A2A_RETRY_BACKOFF_SECONDS` | 2s base, *2 multiplier, capped at 8s | Shared with RouterCore so SLA stays under 12s P95. |
-| Telegram SLA Guard | 12s P95 | RouterCore aborts call if `wall_clock` exceeds guard even mid-poll, returning informative error to operator. |
-
-`A2AIntegrationService` records `attempt_count` and passes final telemetry (latency, retries) back to RouterCore for metrics.
-
-## 5. Error Propagation Matrix
-| Event Source | Detection | Classification | Router Behavior |
+## 4. Timeout, Polling, and Retry Controls
+| Control | Default | Owner | Behavior |
 | --- | --- | --- | --- |
-| HTTP transport failure (`httpx.ConnectError`, TLS) | Exception from `Fasta2AClientAdapter` | `transient_error` | Retry within limit; on exhaustion reply with outage template referencing `correlation_id`. |
-| HTTP 5xx / JSON decoding | Response status / parsing error | `transient_error` | Retry once; include upstream status code + hint to reissue later. |
-| HTTP 4xx (≠429) or upstream `failed/rejected` | Response payload final state | `fatal_error` | No retry. Include upstream message + persona guidance. |
-| 429 rate limit | Status code or `Retry-After` header | `transient_error` | Sleep `Retry-After` if provided, else `A2A_RETRY_BACKOFF_SECONDS`, then final retry. |
-| `canceled` state | Poll response | `transient_error` | Retry once (if within SLA) else respond with cancellation notice. |
-| Unexpected artifact media | Artifact inspection | `fatal_error` but mask payload | Log + quarantine pointer, instruct operator to escalate. |
-| Timeout reached | `poll_elapsed >= timeout` or Router SLA guard | `transient_error` | Provide message "Timed out after <n>s (correlation <id>)". |
+| `A2A_POLL_INTERVAL_SECONDS` | 2s ±200ms jitter | DispatchController | Sleep between `get_task` calls; jitter prevents lockstep bursts. |
+| `A2A_POLL_TIMEOUT_SECONDS` | 30s | DispatchController | Hard ceiling per attempt; raises `transient_error` when exceeded. |
+| `A2A_MAX_POLLS` | Derived (`timeout ÷ interval`) | DispatchController | Guardrail preventing runaway loops even if timeout misconfigured. |
+| `A2A_RETRY_LIMIT` | 1 | RetryOrchestrator | Applies to transient failures (timeouts, HTTP 5xx, `canceled`, JSON decode). |
+| `A2A_RETRY_BACKOFF_SECONDS` | 2s base, ×2 multiplier, max 8s | RetryOrchestrator | Aligns with Router-level backoff to keep <12s P95 SLA. |
+| Telegram SLA Guard | 12s P95 across intake→reply | RouterCore | Cancels in-flight A2A call if cumulative latency threatens SLA; returns holding message w/ task ID. |
+| `A2A_API_KEY_ISSUED_AT` | ISO timestamp | ConfigRegistry | Startup validation fails if key age >90d to honor rotation policy. |
 
-All errors raise `A2AIntegrationError` with structured fields so RouterCore logging remains consistent.
+Timers live inside the integration service so downstream code need only await `execute()`. The SLA guard uses monotonic timers to abort polling early and instruct the adapter to cancel outstanding tasks when possible.
 
-## 6. Configuration & Security Considerations
-- Configuration loader validates required env vars (`A2A_BASE_URL`) during startup and optionally `A2A_API_KEY`. Missing required entries cause boot failure with structured `config.error` log.
-- `A2A_API_KEY` (when set) is injected via the upstream client's `AuthInterceptor` to add an `Authorization: Bearer` header; secrets never appear in logs or Telegram replies.
-- Persona validation ensures `persona_tag ∈ A2A_ALLOWED_PROMPT_TAGS`; router rejects unsupported tags before dispatch.
-- Observability hooks emit `a2a.request`, `a2a.response`, `a2a.failure` events with correlation ID, persona, attempt count, and latency buckets.
+## 5. Error Propagation & Signaling
+| Source Event | Detection Point | Classification | Router Action | Telemetry |
+| --- | --- | --- | --- | --- |
+| `httpx.ConnectError`, TLS failures | Adapter send/poll | `transient_error` | Retry within limit; final response instructs operator to re-issue. | `a2a.failure` (`reason=transport`) + counter increment |
+| HTTP 5xx / JSON decode issues | Adapter poll loop | `transient_error` | Retry once; include upstream status in body metadata. | Emit latency + error counters |
+| HTTP 4xx (≠429) or upstream `failed/rejected` | Adapter final state | `fatal_error` | No retry; respond with upstream message + persona guidance. | `a2a.failure` (`reason=caller`) |
+| 429 with optional `Retry-After` | Adapter poll | `transient_error` | Sleep indicated value (bounded by SLA) before final retry. | `a2a.retry_total` + histogram bucket |
+| `canceled` state mid-poll | Adapter | `transient_error` | Retry if SLA headroom remains, else respond with cancellation note. | Cancellation metric |
+| SLA timeout (Router guard) | DispatchController | `transient_error` | Send holding reply, continue background poll up to 12s total, then emit `timeout`. | `a2a.timeout_total` |
+| Unexpected artifact type | Normalizer | `fatal_error` (masked payload) | Return warning referencing quarantine pointer. | `a2a.failure` (`reason=artifact`) |
 
-## 7. Sequence Flows
+All failures raise `A2AIntegrationError` with fields `{classification, task_id?, correlation_id, attempt_count, upstream_state}` so Router logging and tests can assert behavior deterministically.
+
+## 6. Sequence Views
+
+### 6.1 Successful Invocation
 ```mermaid
 sequenceDiagram
-    participant Router as RouterCore
-    participant Service as A2AIntegrationService
-    participant Adapter as Fasta2AClientAdapter
+    participant TG as RouterCore
+    participant INT as A2AIntegrationService
+    participant AD as Fasta2AClientAdapter
     participant A2A as Upstream A2AClient
 
-    Router->>Service: RouterCommand (sanitized text + persona)
-    Service->>Service: Validate config + persona tag
-    Service->>Service: Build A2AEnvelopedRequest + metadata
-    Service->>Adapter: run(enveloped_request)
-    Adapter->>A2A: send_message(message)
-    A2A-->>Adapter: task_id
-    loop Poll until final state or timeout
-        Adapter->>A2A: get_task(task_id)
-        A2A-->>Adapter: task_state
-        Adapter-->>Service: state update
-        Service-->>Service: SLA guard check
+    TG->>INT: RouterCommand (sanitized, persona, metadata)
+    INT->>INT: Validate persona + config
+    INT->>INT: Compose A2AEnvelopedRequest
+    INT->>AD: run(enveloped_request)
+    AD->>A2A: POST /send_message
+    A2A-->>AD: task_id
+    loop Poll until final state
+        AD->>A2A: GET /tasks/{task_id}
+        A2A-->>AD: state snapshot
+        AD-->>INT: state, latency
+        INT->>INT: SLA guard + retry budget check
     end
-    Adapter-->>Service: normalized A2AResult
-    Service-->>Router: A2AResult / A2AIntegrationError
-    Service-->>Telemetry: a2a.request/response/failure events
+    AD-->>INT: A2ATaskOutcome(final_state=completed)
+    INT->>INT: Normalize artifacts → A2AResult(success)
+    INT-->>TG: A2AResult + metadata
+    INT->>Telemetry: a2a.request/response metrics
 ```
 
-## 8. Developer Handoff Notes
-- `A2AIntegrationService` should expose an async API (`async def execute(command: RouterCommand) -> A2AResult`) so RouterCore awaits it directly.
-- Ensure the adapter is injectable/mocks for tests to trigger transient/fatal paths defined above.
-- Provide OpenAPI-like documentation for downstream consumers if additional services integrate with the A2A adapter in the future.
+### 6.2 Failure w/ Retry then Timeout
+```mermaid
+sequenceDiagram
+    participant TG as RouterCore
+    participant INT as A2AIntegrationService
+    participant AD as Fasta2AClientAdapter
+    participant A2A as Upstream A2AClient
+
+    TG->>INT: RouterCommand
+    INT->>AD: run(request)
+    AD->>A2A: POST /send_message
+    A2A-->>AD: task_id
+    loop Poll attempt #1
+        AD->>A2A: GET /tasks/{task_id}
+        A2A-->>AD: final_state = failed (HTTP 5xx)
+        AD-->>INT: transient_error + attempt_count=1
+    end
+    INT->>INT: Retry budget remaining? yes
+    Note over INT: Backoff wait = 2s (bounded by SLA)
+    INT->>AD: run(request) attempt #2
+    AD->>A2A: POST /send_message
+    A2A-->>AD: task_id
+    loop Poll attempt #2
+        AD->>A2A: GET /tasks/{task_id}
+        A2A-->>AD: still running
+        INT->>INT: SLA guard exceeds 12s
+    end
+    INT-->>AD: cancel(task_id)
+    AD-->>INT: timeout state
+    INT-->>TG: A2AResult(status=transient_error, body="Timed out after 10s", metadata task_id)
+    INT->>Telemetry: a2a.timeout_total++, emit holding message event
+```
+
+## 7. Security, Configuration, and Observability Anchors
+- **Configuration validation** — Startup uses `ConfigRegistry` to ensure `A2A_BASE_URL` is HTTPS (unless `ENV=dev`), optional `A2A_API_KEY` age <90d, and persona allowlist matches `A2A_ALLOWED_PROMPT_TAGS`. Fail fast with structured `config.error` log when requirements are unmet.
+- **Auth & transport hardening** — The adapter loads secrets from memory only, registers the upstream `AuthInterceptor`, and enforces TLS 1.2+. Non-TLS origins trigger `reduced_trust` mode logs unless explicitly allowed via `A2A_ALLOW_INSECURE=true` in local dev.
+- **Metadata hygiene** — Cleartext usernames are passed upstream but hashed in logs. Prompt text is never persisted; only the SHA256 checksum plus metadata envelopes reach storage.
+- **Observability** — Emit counters (`a2a_success_total`, `a2a_transient_error_total`, `a2a_fatal_error_total`, `a2a_retry_total`) and histograms (`a2a_latency_ms`). Telegram `/status` command surfaces latest latency percentiles plus persona-sliced metrics.
+- **Extensibility** — Componentized boundaries make it straightforward to plug alternate clients (REST, gRPC) or additional persona tags without touching Router transport logic. The architecture also enables integration tests to mock `Fasta2AClientAdapter` and assert retry/error branches.
+
+This architecture document is the authoritative input for the downstream design and implementation stages of Feature 2.

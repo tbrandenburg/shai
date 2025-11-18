@@ -1,35 +1,70 @@
 # Deployment Architecture Plan
 
 ## Objective & Scope
-Design a uv-focused deployment flow for the Telegram ↔ A2A relay that ensures reproducible process supervision, deterministic secret sourcing, and auditable release promotion across dev, staging, and production. Inputs include `output/34/deployment_requirements.md`, Feature 1/2 specs, and implemented router/adapters.
+Translate the deployment requirements into an actionable architecture that governs uv-based runtime supervision, deterministic configuration sourcing, reproducible artifact packaging, and tightly gated promotion flows across dev, staging, and production. Inputs include `output/34/deployment_requirements.md`, Feature 1/2 assets, implemented router/adapters, and the approved observability + security guardrails.
 
-## Process Supervision Topology
-- **Baseline runtime**: All environments package the uv toolchain (`uv`, lockfile, `.python-version`) with the repo. Each launch invokes `uv run bots/telegram_router.py --check-config` prior to entering the polling loop. Structured JSON logs stream to stdout and are captured by the supervisor.
-- **Graceful lifecycle**: Supervisors deliver SIGTERM and allow 30s drain time; the router drains inflight polls, flushes logs, and reports final heartbeat before exit. Restart back-off (max 5 attempts/15 min) prevents crash loops.
-- **Health probes**: Deployments expose a lightweight `/healthz` (Unix socket or localhost HTTP) served by the router after config validation, plus CI smoke checks that call `uv run bots/telegram_router.py --check-config` and verify Telegram/A2A reachability via mock credentials.
+## System Overview
+- **Artifact of record**: An immutable OCI image (or tarball for legacy VMs) that embeds the uv binary, `.python-version`, `uv.lock`, `bots/telegram_router.py`, `services/a2a_adapter.py`, and launcher shims. The image digest + `uv lock` checksum form the promotion key.
+- **Runtime contract**: Every entrypoint invokes `uv run bots/telegram_router.py --check-config` before starting the long-poll loop, exports structured JSON logs, and exposes `/healthz` once Telegram and A2A reachability succeed.
+- **Supervision fabric**: Local dev uses direct `uv run`; staging and production enforce supervisors (systemd, runit, Procfile worker, or Kubernetes Deployment) that deliver SIGTERM with a 30s grace, restart with capped back-off, and annotate logs with env/build metadata.
 
-| Environment | Supervision Model | Notes |
-| --- | --- | --- |
-| Local / Dev | Direct `uv run` or `uvx` launched via make/just target. | Developers rely on `.env` in repo; hot reload disabled to preserve uv lock parity. Logs stay local; optional `entr` watcher for rapid feedback. |
-| Staging | System-level supervisor (systemd service or lightweight runit/Procfile) on a CI-managed VM/container. | CI job performs `uv sync`, installs service unit/Procfile, and hands off to supervisor that restarts on failure and publishes structured logs to staging collector. Secrets injected from staging vault at service start. |
-| Production | HA pair of containers/pods managed by orchestrator (Kubernetes Deployment, Nomad job, or SupervisorD on active/standby VMs). | Immutable image is built with `uv lock` + exported requirements. Pods mount read-only root FS with tmp scratch; Kubernetes `livenessProbe` hits `/healthz`, `preStop` hook grants 30s drain. Horizontal scaling gated by chat scope rules. |
+## Environment Topologies
+| Environment | Artifact Source | Supervision & Launch | Config & Secrets | Observability & Scaling |
+| --- | --- | --- | --- | --- |
+| **Local / Dev** | `uv sync --locked` on workstation; optional `uv export` cache. | Direct `uv run bots/telegram_router.py --env-file .env`; optional `just dev:router`. Hot reload disabled to match lockfile. | `.env` checked out from repo plus sandbox tokens managed per developer. Secrets never leave workstation. | Logs stay on console; metrics/traces stdout only. Single process, no scaling. |
+| **Staging** | CI builds Containerfile (`uv export --format requirements.txt` + `pip install --no-deps`), pushes image to staging registry. | Systemd unit, runit service, or Procfile dyno launches `uv run ... --env-file /run/secrets/.env.runtime`. Supervisor restarts crashes and emits heartbeat metrics. | CI renders `.env.runtime` from staging vault, stores SHA-256 + ticket ID, and injects via tmpfs. Config diff ensures parity with production minus secret values. | Structured logs ship to staging log drain; OTEL tracing at 25%; Prometheus sidecar scrapes metrics. Single active instance for Telegram polling. |
+| **Production** | Same digest promoted from staging registry; cosign signature verified, `uv hash` rechecked. | Kubernetes Deployment (2 replicas, 1 active poller/1 passive) or HA VM pair; readiness probe hits `/healthz`, preStop waits 30s, liveness restarts on stall. Active/standby semantics enforced via feature flag in config manifest. | Secrets pulled from managed vault (AWS SM/GCP SM) using workload identity; persona map + non-secret config versioned in git manifest. Drift detection blocks deploy if env var sets diverge >5%. | Logs to SIEM (90 days), OTEL fatal-span sampling 100%, Prometheus metrics with PagerDuty alerts. Autoscaler obeys queue depth + latency guardrails before adding compute. |
 
-## Secret Sourcing & Configuration Distribution
-1. **Secret catalog enforcement**: `TELEGRAM_BOT_TOKEN`, `A2A_API_KEY`, and other sensitive values live exclusively in the environment secret manager (AWS Secrets Manager, Google Secret Manager, or Vault). Non-secret configuration (`TELEGRAM_POLL_TIMEOUT`, persona tags) is managed via `.env.example` and per-environment manifests tracked in git.
-2. **CI templating**: During deploy, CI obtains secrets through workload identity and renders `/run/secrets/.env.runtime` (values masked in logs). Each render records a checksum plus change ticket ID in the deployment audit log.
-3. **Runtime delivery**: Supervisors either export env vars before exec or pass `--env-file /run/secrets/.env.runtime` to `uv run`. Files never persist beyond the host TMPFS, and crash dumps scrub secret values via configured log filters.
-4. **Configuration parity guard**: Promotion jobs run `config diff` comparing staging vs prod manifests; drift >5% or any missing secret aborts promotion. Approved diffs require linked change tickets and reviewer sign-off stored in CI metadata.
-5. **Manifest artifacts**: Every deployment emits a `config-manifest.yaml` summarizing effective non-secret values, secret names (not values), `.env` checksum, uv lock checksum, and build SHA for audit replay.
+## Process Supervision & Capacity Controls
+1. **Lifecycle hooks**: `/healthz` only returns 200 once ConfigGuard passes and Telegram/A2A handshake succeeds. Supervisors gate traffic on this signal.
+2. **Drain protocol**: PreStop (Kubernetes) or systemd `ExecStop` sends SIGTERM, waits 30s, and cancels long poll to avoid duplicate replies. Router confirms queue depth zero before exit.
+3. **Crash safety**: Supervisors limit restart bursts to 5 attempts/15 minutes and emit `router.uptime_seconds` counters for monitoring.
+4. **Scaling template**: Default request 500m CPU / 512 MiB; autoscaler can bump to 1 vCPU / 1 GiB when `queue.wait_ms` or `latency.round_trip_ms` alarms fire. Additional pollers require documented Telegram chat sharding plus offset coordination stored in architecture doc.
+5. **Back-pressure failsafe**: When CPU >60% or latency P95 >12s, orchestrator first throttles via config (`RATE_LIMIT_PER_MINUTE`, queue depth) before provisioning new compute, honoring Telegram policy constraints.
 
-## Release Promotion Strategy
-1. **Source to artifact**: Merges to main trigger CI that runs lint/tests, locks dependencies via `uv lock --frozen`, and builds an OCI image or tarball with the uv toolchain plus bot sources. Artifacts are signed (cosign/slsa provenance) and pushed to the registry.
-2. **Staging rollout**: Deployment pipeline pulls the immutable artifact, runs `uv run ... --check-config`, and applies staging config/secret bundles. Systemd or Kubernetes supervisor updates the single staging instance. Smoke tests execute `pytest tests/test_telegram_routing.py` and a Telegram/A2A loopback script to confirm connectivity. Results and log excerpts feed `output/34/deployment_test_report.md`.
-3. **Gate checks**: Automated checks verify security scanners (SCA on uv lock, container scans) and ensure observability endpoints are emitting metrics/logs. Manual approval is requested only after config diff passes and all checks are green.
-4. **Production promotion**: Upon approval, GitOps-style deployment job promotes the exact artifact digest plus config manifest to production. Kubernetes uses rolling update with maxUnavailable=1; VM/systemd path performs blue/green where standby is brought up, health-checked, then traffic flipped via load balancer or firewall rule.
-5. **Post-deploy validation & rollback**: Observability dashboards monitor latency P95, error ratios, and unauthorized chat attempts for 30 minutes. If SLOs breach, rollback is automated: Kubernetes simply redeploys previous ReplicaSet; VM path reverts systemd unit to last known good artifact using recorded build SHA. Rollback also reinstalls the prior config manifest to maintain parity.
-6. **Audit trail**: Each promotion logs build SHA, uv lock checksum, config manifest checksum, operator ID, approval ticket, and secret version IDs. Logs reside with deployment notes for compliance review.
+## Artifact Packaging & Supply Chain
+1. **Build stage**
+   - Trigger: merge or release tag.
+   - Steps: `uv lock --frozen` validation → `uv export --format requirements.txt` → Containerfile installs uv + dependencies → copy repo, `.python-version`, configs.
+   - Output: OCI image digest + `uv lock` checksum captured in CI metadata.
+2. **Security & signing**
+   - Run SCA against `uv.lock`, container vulnerability scan (Trivy/Grype), and `uv hash` tamper check.
+   - Sign image with cosign + attach provenance (SLSA attestation) referencing git SHA and pipeline ID.
+3. **Artifact registry**
+   - Dev/staging share staging registry; prod pulls from immutable prod registry fed only via promotion job.
+   - Drift detection ensures staging/prod image digests match; mismatch blocks deploy.
+4. **Runtime bundle**
+   - Deployments mount read-only file system, keeping uv caches in `/tmp` only.
+   - `config-manifest.yaml` and signed checksum accompany artifact for audit replay and DR restoration.
 
-## Additional Safeguards
-- **Security**: Containers drop `CAP_NET_RAW`, run as non-root, enforce egress allow-lists (Telegram + A2A), and schedule nightly vulnerability scans on the uv lockfile dependencies. CI blocks release on critical CVEs.
-- **Observability hooks**: Supervisors inject `env` and `build_sha` labels into all logs/metrics. OTLP exporters are enabled in staging/prod through `OTEL_EXPORTER_OTLP_ENDPOINT` to trace Telegram ↔ A2A spans end-to-end.
-- **Documentation as code**: This plan, runbooks, and config manifests are versioned alongside source to satisfy the documentation-as-code principle stated in the DevOps guidelines.
+## Configuration & Secret Distribution
+1. **Source of truth**: `.env.example` documents non-secret defaults; `config/environments/*.yaml` (git) lists per-env overrides; secret catalog maintained in vault with rotation policies (90/180 days, etc.).
+2. **Templating engine**: CI uses env-aware Jinja/ytt templates to merge manifest + secrets, output `/run/secrets/.env.runtime`, and produce a redacted diff stored with deploy logs.
+3. **Verification**: `uv run bots/telegram_router.py --check-config` validates required vars, persona map hash, and Telegram chat allowlist checksum. Failure aborts deploy.
+4. **Parity enforcement**: `config diff` compares staging vs production manifests (excluding values) and blocks >5% drift or missing keys; operator must attach ticket ID for every intentional change.
+5. **Incident hooks**: On suspected leak, rotation pipeline invalidates tokens, regenerates `.env.runtime`, increments manifest version, and re-runs deploy with incident ID appended.
+
+## Promotion Flow & Gates
+1. **Dev → Staging**
+   - Preconditions: green `pytest tests/test_telegram_routing.py` + `tests/test_a2a_adapter.py`, passing lint, successful container + SCA scans, config diff vs template.
+   - Actions: Deploy staging image, run smoke script hitting Telegram sandbox + mocked A2A, verify `/healthz`, soak for 30 minutes while collecting latency + queue depth metrics.
+   - Evidence: Upload log excerpts, metrics screenshots, and rendered config diff to `output/34/deployment_test_report.md`.
+2. **Staging → Production**
+   - Additional gates: container scan rerun on final digest, config manifest signed via KMS key referenced as `CONFIG_MANIFEST_SIGNATURE`, operator approval ID recorded, drift check vs production secrets.
+   - Deployment: GitOps job updates production manifest referencing same artifact digest and secret versions. Kubernetes path performs rolling update (maxUnavailable=1); VM path executes blue/green toggling load balancer after passive node passes health checks.
+3. **Post-deploy & rollback**
+   - Monitoring: P95 latency <12s, `a2a.failure_total{classification="fatal"}` <3/5m, `rate_limit.hit` <10/persona/12h. Automated alerts escalate via PagerDuty.
+   - Rollback triggers: SLO breach, config diff failure, or incident flag. GitOps reverts commit or redeploys previous artifact+manifest pair using stored checksums.
+
+## Observability & Audit Architecture
+- **Logging**: Supervisors stream stdout/stderr to environment-specific sinks (dev console, staging log drain 14d, prod SIEM 90d). Mandatory fields include `event`, `correlation_id`, `chat_id_hash`, `persona_tag`, `status`, `latency_ms`, `env`, and `build_sha`.
+- **Metrics**: Prometheus/StatsD exporters emit `latency.round_trip_ms`, `queue.depth`, `a2a.failure_total`, `router.uptime_seconds`, and `rate_limit.hit`. Dashboards annotate deployments using config manifest ID and git SHA.
+- **Tracing**: OpenTelemetry exporters enabled via `OTEL_EXPORTER_OTLP_ENDPOINT`; staging samples at 25%, prod captures 100% of fatal spans. Spans tag persona, env, Telegram update offset, and A2A classification.
+- **Audit trail**: Deployment job logs include artifact digest, `uv lock` checksum, config manifest checksum, operator + approval IDs, secret version numbers, and promotion timestamps. Entries stored alongside release notes for DR replay.
+
+## Security & Compliance Controls
+- Non-root runtime, read-only root FS, drop `CAP_NET_RAW`, and limit egress to `api.telegram.org` + `A2A_BASE_URL` via NetworkPolicy/Security Group.
+- Automated scanning on every commit plus nightly re-scan of released images; pipeline blocks on critical CVEs.
+- Secrets rotation cadence enforced by CI preflight; failure to meet cadence blocks promotion.
+- Disaster recovery: cold standby instructions reference latest signed config manifest + uv artifact; restore target <30 minutes validated quarterly.
+- Documentation-as-code: this architecture, manifests, runbooks, and test evidence all live in repo to meet compliance and knowledge-sharing commitments.
