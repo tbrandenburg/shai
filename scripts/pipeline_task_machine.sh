@@ -185,9 +185,9 @@ while grep -q "\\[ \\]" "$PLAN_FILE"; do
 You are the **TASK MACHINE EXECUTOR**.
 
 MANDATORY BEHAVIOR:
+- ABSOLUTE CRUCICAL RULE: Set your root working directory to \`${OUTPUT_DIR}\` for all file operations. Files modified or created somewhere else will NOT be recognized by the pipeline.
 - Use MCP tools to read the shared plan at \`${PLAN_FILE}\`.
 - Review the Context section to understand the overall objective.
-- Set your working directory to \`${OUTPUT_DIR}\` for all file operations.
 - Identify the FIRST unchecked task (first line containing \`- [ ]\`) and execute ONLY that task.
 - BEFORE executing the task:
   1. Extract the role name from the task (e.g., [data-analyst], [Custom Marketing Specialist])
