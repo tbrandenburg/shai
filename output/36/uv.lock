@@ -1,0 +1,67 @@
+version = 1
+requires-python = ">=3.11"
+
+[[package]]
+name = "docling"
+version = "2.2.0"
+source = { name = "pypi" }
+
+[[package]]
+name = "pymilvus"
+version = "2.4.0"
+source = { name = "pypi" }
+
+[[package]]
+name = "sentence-transformers"
+version = "2.7.0"
+source = { name = "pypi" }
+
+[[package]]
+name = "langchain-text-splitters"
+version = "0.0.2"
+source = { name = "pypi" }
+
+[[package]]
+name = "structlog"
+version = "24.1.0"
+source = { name = "pypi" }
+
+[[package]]
+name = "pydantic"
+version = "2.6.4"
+source = { name = "pypi" }
+
+[[package]]
+name = "pydantic-settings"
+version = "2.2.1"
+source = { name = "pypi" }
+
+[[package]]
+name = "numpy"
+version = "1.26.4"
+source = { name = "pypi" }
+
+[[package]]
+name = "llama-cpp-python"
+version = "0.2.83"
+source = { name = "pypi" }
+
+[[package]]
+name = "pypdf"
+version = "4.2.0"
+source = { name = "pypi" }
+
+[[package]]
+name = "typer"
+version = "0.12.3"
+source = { name = "pypi" }
+
+[[package]]
+name = "rich"
+version = "13.7.1"
+source = { name = "pypi" }
+
+[[package]]
+name = "pytest"
+version = "8.2.1"
+source = { name = "pypi" }

@@ -1,0 +1,37 @@
+pdf_paths = ["fixtures/dummy.pdf"]
+question = "Summarize the dummy PDF contents."
+export_type = "chunks"
+
+[chunk]
+size = 800
+overlap = 80
+
+[retrieval]
+top_k = 4
+
+[embeddings]
+model_name = "sentence-transformers/all-MiniLM-L6-v2"
+device = "cpu"
+batch_size = 32
+normalize_embeddings = true
+
+[milvus]
+uri = "file:./.milvus/docling.db?mode=memory&cache=shared"
+collection_name = "docling_chunks"
+dim = 384
+drop_existing = true
+consistency_level = "Bounded"
+
+[llm]
+temperature = 0.1
+max_tokens = 256
+context_window = 2048
+
+[runtime]
+json_logs = false
+cache_dir = ".cache/docling_milvus_rag"
+wipe_store = true
+persist_store = true
+log_level = "INFO"
+verbose = false
+llm_backend = "local-llama"

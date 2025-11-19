@@ -1,0 +1,1 @@
+{"author":"tbrandenburg","body":"@task Turn this into a simple UV project: https://colab.research.google.com/github/docling-project/docling/blob/main/docs/examples/rag_langchain.ipynb\nand test it with a dummy PDF.\nKeep it very simple.\nRun it without an HuggingFace token.\nI want to run it with \"uv run docling-milvus-rag\"","comments":[],"title":"Docling RAG"}
