@@ -12,8 +12,6 @@ def test_pipeline_runner_emits_summary(tmp_path: Path) -> None:
     settings = PipelineSettings.from_env(
         {
             "DOC_CACHE_DIR": str(tmp_path),
-            "SOURCE_URL": "https://example.com/test.pdf",
-            "QUERY_TEXT": "What is documented?",
         }
     )
     summary = PipelineRunner().run(settings)

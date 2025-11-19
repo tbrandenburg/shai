@@ -49,32 +49,42 @@ class PipelineRunner(RunnerProtocol):
         self.embedder = embedder or MiniLMEmbedder()
         self.storage = storage or MilvusStore()
         self.search = search or LangChainSearch(self.storage, self.embedder)
+        self._owns_storage = storage is None
+        self._owns_search = search is None
 
     def run(self, settings: PipelineSettings) -> RunSummary:
         settings.ensure_valid()
+        if self._owns_storage:
+            self.storage = MilvusStore(settings.milvus_uri)
+        if self._owns_search:
+            self.search = LangChainSearch(self.storage, self.embedder)
         metrics: dict[str, dict[str, Any]] = {}
         with ExitStack() as stack:
             documents = self._capture_stage(
                 "loader",
                 metrics,
+                settings.metrics_verbose,
                 lambda: self.loader.load(settings),
                 count=lambda docs: len(docs),
             )
             chunks = self._capture_stage(
                 "chunker",
                 metrics,
+                settings.metrics_verbose,
                 lambda: self.chunker.split(documents, settings),
                 count=lambda rows: len(rows),
             )
             embeddings = self._capture_stage(
                 "embedder",
                 metrics,
+                settings.metrics_verbose,
                 lambda: self.embedder.embed(chunks, settings),
                 count=lambda rows: len(rows),
             )
             storage_handle = self._capture_stage(
                 "storage",
                 metrics,
+                settings.metrics_verbose,
                 lambda: self.storage.persist(embeddings, settings.milvus_collection),
                 count=lambda handle: int(handle.metadata.get("insert_count", "0")),
                 enrich=lambda handle: {
@@ -86,6 +96,7 @@ class PipelineRunner(RunnerProtocol):
             search_result = self._capture_stage(
                 "search",
                 metrics,
+                settings.metrics_verbose,
                 lambda: self.search.ask(storage_handle, settings.query_text, settings),
                 count=lambda result: len(result.sources),
                 enrich=lambda result: {"question": result.question},
@@ -113,6 +124,7 @@ class PipelineRunner(RunnerProtocol):
         self,
         name: str,
         metrics: dict[str, dict[str, Any]],
+        verbose: bool,
         producer: Callable[[], Any],
         *,
         count: Callable[[Any], int],
@@ -125,4 +137,6 @@ class PipelineRunner(RunnerProtocol):
         if enrich is not None:
             metadata.update(enrich(result))
         metrics[name] = metadata
+        if verbose:
+            logger.debug("Stage %s metrics: %s", name, metadata)
         return result

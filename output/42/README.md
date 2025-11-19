@@ -10,30 +10,27 @@ This directory hosts the UV-managed packaging scaffold for the Docling-powered m
 ## Setup & Usage
 1. `uv sync` – create the virtual environment from `pyproject.toml` / `uv.lock`.
 2. `uv run pyrag` – execute the orchestration CLI (default settings shown in `.env.example`).
-3. Supporting commands defined under `[tool.uv.scripts]`:
+3. Optional overrides can be supplied inline, e.g. `uv run pyrag -- --top-k 10 --metrics-verbose true` to test precedence without editing `.env`.
+4. Supporting commands defined under `[tool.uv.scripts]`:
    - `uv run format`
    - `uv run lint`
    - `uv run test`
    - `uv run validate`
 
 ## Configuration
-Copy `.env.example` to `.env` and adjust the following keys:
+Copy `.env.example` to `.env` and adjust only the nine supported keys:
 
-| Variable | Purpose |
+| Variable | Purpose / Range |
 | --- | --- |
-| `SOURCE_URL` | Document, Docling bundle, or dataset root to ingest |
-| `EXPORT_TYPE` | Docling export mode (`DOC_CHUNKS`/`MARKDOWN`) |
-| `DOC_CACHE_DIR` | Local folder used to cache Docling payloads |
-| `SOURCE_HEADERS` | Optional JSON/CSV header overrides for the source request |
-| `MILVUS_URI` | URI to an external Milvus deployment (leave blank for Milvus Lite fallback) |
-| `MILVUS_COLLECTION` | Target collection name |
-| `QUERY_TEXT` | Validation query fed to the retriever |
-| `TOP_K` | Number of retrieval hits to show |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Hybrid chunker parameters ensuring `chunk_size > chunk_overlap` |
-| `HF_TOKEN` | Optional HuggingFace token (not required for `all-MiniLM-L6-v2`) |
-| `LOG_LEVEL` | Python logging level |
-| `VALIDATION_ENABLED` | Toggle validation gate in later milestones (on by default) |
-| `METRICS_VERBOSE` | Emit per-stage telemetry to stdout when true |
+| `DOC_CACHE_DIR` | Writable folder for Docling cache artifacts (default `.pyrag_cache`). |
+| `MILVUS_URI` | Optional external Milvus endpoint; leave blank to auto-provision `file://<DOC_CACHE_DIR>/milvus-lite`. |
+| `MILVUS_COLLECTION` | Target collection (1-64 chars, alphanumeric/underscore, default `pyrag_docs`). |
+| `TOP_K` | Retrieval depth (default 5, clamped to 1–20). |
+| `CHUNK_SIZE` | Chunk size for the hybrid splitter (default 1000, allowed 200–2000). |
+| `CHUNK_OVERLAP` | Overlap between chunks (default 200, must be `0 ≤ overlap < chunk_size`). |
+| `LOG_LEVEL` | Python logging level (INFO default; accepts DEBUG/INFO/WARNING/ERROR). |
+| `VALIDATION_ENABLED` | Boolean toggle for validation (default true). |
+| `METRICS_VERBOSE` | Boolean toggle for extra per-stage telemetry (default false). |
 
 ## Project Layout
 ```

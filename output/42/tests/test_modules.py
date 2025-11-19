@@ -20,13 +20,18 @@ def _build_settings(tmp_path: Path, *, name: str = "doc_cache") -> PipelineSetti
     cache_dir = tmp_path / name
     cache_dir.mkdir(exist_ok=True)
     return PipelineSettings(
-        source_url="https://example.com/docling.pdf",
-        export_type=ExportType.DOC_CHUNKS,
         doc_cache_dir=cache_dir,
+        milvus_uri=f"file://{cache_dir}/milvus-lite",
+        milvus_collection="test_collection",
+        top_k=2,
         chunk_size=80,
         chunk_overlap=16,
+        log_level="INFO",
+        validation_enabled=True,
+        metrics_verbose=False,
+        source_url="https://example.com/docling.pdf",
+        export_type=ExportType.DOC_CHUNKS,
         query_text="How does Docling structure documents?",
-        top_k=2,
     )
 
 
@@ -116,11 +121,15 @@ def test_cli_run_executes_end_to_end(tmp_path: Path, monkeypatch: Any) -> None:
     runner = CliRunner()
     result = runner.invoke(
         app,
-        [],
+        [
+            "run",
+            "--top-k",
+            "2",
+            "--metrics-verbose",
+            "true",
+        ],
         env={
             "DOC_CACHE_DIR": str(cache_dir),
-            "SOURCE_URL": "https://example.com/qa.pdf",
-            "QUERY_TEXT": "Summarize the Docling QA pipeline",
         },
     )
     assert result.exit_code == 0
