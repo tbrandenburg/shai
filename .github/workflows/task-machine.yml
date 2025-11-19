@@ -181,7 +181,7 @@ jobs:
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         id: git-status
         run: |
-          if git status --porcelain | grep .; then
+          if git status --porcelain -- output | grep .; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
@@ -198,7 +198,7 @@ jobs:
           else
             git checkout -b "$BRANCH_NAME"
           fi
-          git add .
+          git add "output/"
           git commit -m "chore: run task machine for issue #$ISSUE_NUMBER"
           git push origin "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
