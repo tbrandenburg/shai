@@ -123,6 +123,13 @@ jobs:
               -f content='eyes'
           fi
 
+      - name: Install uv
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          set -euo pipefail
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
       - name: Install sst/opencode
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
