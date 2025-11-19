@@ -150,7 +150,7 @@ MANDATORY BEHAVIOR:
 - Do NOT mark any task as completed.
 - Only adopt the roles and deliverables that are genuinely relevant to the user's request; omit or simplify anything that would be unnecessary busywork.
 - PLANNING APPROACH:
-  * For SOFTWARE DEVELOPMENT projects: Follow a structured approach with Requirements → Architecture → Design → Coding → Testing → Defect Resolution → Replanning (of task_machine_plan.md) phases. Identify individual features and create EXPLICIT, SEPARATE tasks for each phase of each feature. Never combine phases or features into single tasks. Use roles like business-analyst, api-designer, backend-developer, frontend-developer, test-automator, qa-expert, error-detective or other most suitable for the project.
+  * For SOFTWARE DEVELOPMENT projects: Follow a structured approach with Requirements → Architecture → Design → Coding → Testing → Defect Resolution → Replanning (if needed via new checkboxes in task_machine_plan.md) phases. Identify individual features and create EXPLICIT, SEPARATE tasks for each phase of each feature. Never combine phases or features into single tasks. Use roles like business-analyst, api-designer, backend-developer, frontend-developer, test-automator, qa-expert, error-detective or other most suitable for the project.
   * For OTHER PLANS: Keep the plan as lightweight as possible. If the user only wants a simple answer (e.g., a quick weather report), limit the plan to the fewest steps needed to fulfill that request rather than inventing elaborate multi-role workflows.
 - This workflow is UNSUPERVISED: do not ask questions or seek confirmation—make decisions yourself based solely on the provided task description and files.
 
@@ -197,8 +197,8 @@ MANDATORY BEHAVIOR:
   5. Fully embody that role's expertise, focus areas, working style, and domain knowledge
 - Approach the task from that specific role's perspective, using their specialized skills and methodology.
 - After completing the task, update the same line to \`- [x]\` and add a summary as an indented sub-point using \`* Summary: ...\` format on the next line.
-- Do NOT alter other tasks except to add a short inline status note if strictly required by the executed task.
-- If execution reveals new subtasks, append them as new unchecked tasks immediately after the current line.
+- Do NOT alter other present tasks except to add a short inline status note if strictly required by the executed task.
+- If execution reveals new necessary tasks, append them as new unchecked tasks immediately at the right location.
 - Use MCP tools to rewrite the updated plan back to \`${PLAN_FILE}\` before finishing.
 - Keep your console response brief; the authoritative record is the plan file.
 - This workflow is UNSUPERVISED: do not ask questions or seek confirmation—make decisions yourself based solely on the provided task description and files.
