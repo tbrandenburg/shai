@@ -1,0 +1,9 @@
+[
+  {
+    "text": "Docling Technical Report placeholder for source https://arxiv.org/pdf/2408.09869. This deterministic stub models loader output so the downstream chunker, embedder, and search stages can run without network access.",
+    "section": "introduction",
+    "page": "1",
+    "checksum": "placeholder",
+    "source_url": "https://arxiv.org/pdf/2408.09869"
+  }
+]
