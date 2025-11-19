@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyrag"
+version = "0.1.0"
+description = "Offline LangChain-style RAG CLI built for uv-managed execution"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "SHAI" }]
+dependencies = [
+  "pypdf>=4.2,<5.0",
+]
+
+dynamic = []
+
+[project.scripts]
+pyrag = "pyrag.__main__:cli"
+
+[tool.uv]
+required-version = ">=0.4"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.2,<9.0",
+]

@@ -1,0 +1,9 @@
+%PDF-1.4
+%‚„œ”
+Dummy PDF Fixture
+===================
+This file acts as a stand-in PDF for integration testing of the pyrag CLI.
+It provides predictable text which the RAG pipeline can read without needing
+external tokens or remote connectivity.
+
+%%EOF
