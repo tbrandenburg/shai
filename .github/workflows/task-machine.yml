@@ -63,6 +63,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Install pip and pytest
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-pytest
+          python3 -m pip install --upgrade pip
+
       - name: Checkout existing issue branch if present
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
