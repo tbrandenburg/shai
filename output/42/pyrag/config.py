@@ -48,7 +48,7 @@ class ConfigDefaults:
     chunk_size: int = 1000
     chunk_overlap: int = 200
     log_level: str = "INFO"
-    validation_enabled: bool = True
+    validation_enabled: bool = False  # Default to false for offline development
     metrics_verbose: bool = False
 
 
