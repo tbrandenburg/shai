@@ -63,12 +63,41 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Install pip and pytest
+      - name: Install uv
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: uv python install
+
+      - name: Install pytest
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: uv pip install pytest
+
+      - name: Install ripgrep
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y python3-pip python3-pytest
-          python3 -m pip install --upgrade pip
+          sudo apt-get install -y ripgrep
+
+      - name: Install sst/opencode
+        if: ${{ steps.admin.outputs.is_admin == 'true' }}
+        run: |
+          set -euo pipefail
+          INSTALL_DIR="$HOME/.opencode/bin"
+          mkdir -p "$INSTALL_DIR"
+
+          TMPDIR="$(mktemp -d)"
+          trap 'rm -rf "$TMPDIR"' EXIT
+          ZIP_PATH="$TMPDIR/opencode.zip"
+
+          curl -fsSL "https://github.com/sst/opencode/releases/latest/download/opencode-linux-x64.zip" -o "$ZIP_PATH"
+          unzip -q "$ZIP_PATH" -d "$TMPDIR"
+          install "$TMPDIR/opencode" "$INSTALL_DIR/opencode"
+
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
 
       - name: Checkout existing issue branch if present
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
@@ -129,37 +158,6 @@ jobs:
               "/repos/$REPOSITORY/issues/$ISSUE_NUMBER/reactions" \
               -f content='eyes'
           fi
-
-      - name: Install ripgrep
-        if: ${{ steps.admin.outputs.is_admin == 'true' }}
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y ripgrep
-
-      - name: Install uv
-        if: ${{ steps.admin.outputs.is_admin == 'true' }}
-        run: |
-          set -euo pipefail
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
-      - name: Install sst/opencode
-        if: ${{ steps.admin.outputs.is_admin == 'true' }}
-        run: |
-          set -euo pipefail
-          INSTALL_DIR="$HOME/.opencode/bin"
-          mkdir -p "$INSTALL_DIR"
-
-          TMPDIR="$(mktemp -d)"
-          trap 'rm -rf "$TMPDIR"' EXIT
-          ZIP_PATH="$TMPDIR/opencode.zip"
-
-          curl -fsSL "https://github.com/sst/opencode/releases/latest/download/opencode-linux-x64.zip" -o "$ZIP_PATH"
-          unzip -q "$ZIP_PATH" -d "$TMPDIR"
-          install "$TMPDIR/opencode" "$INSTALL_DIR/opencode"
-
-          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
 
       - name: Configure opencode
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
