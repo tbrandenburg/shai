@@ -12,7 +12,7 @@ from pyrag.chunker import Chunk, ChunkerProtocol, HybridChunker
 from pyrag.config import PipelineSettings
 from pyrag.embedder import EmbedderProtocol, Embedding, MiniLMEmbedder
 from pyrag.loader import DocChunk, DoclingLoader, LoaderProtocol
-from pyrag.logging import get_logger
+from pyrag.logging import get_logger, safe_extra
 from pyrag.search import LangChainSearch, SearchOrchestrator, SearchResult
 from pyrag.storage import MilvusStore, StorageProtocol
 
@@ -44,52 +44,65 @@ class PipelineRunner(RunnerProtocol):
         storage: StorageProtocol | None = None,
         search: SearchOrchestrator | None = None,
     ) -> None:
-        self.loader = loader or DoclingLoader()
-        self.chunker = chunker or HybridChunker()
-        self.embedder = embedder or MiniLMEmbedder()
-        self.storage = storage or MilvusStore()
-        self.search = search or LangChainSearch(self.storage, self.embedder)
-        self._owns_storage = storage is None
-        self._owns_search = search is None
+        self.loader = loader
+        self.chunker = chunker
+        self.embedder = embedder
+        self.storage = storage
+        self.search = search
 
     def run(self, settings: PipelineSettings) -> RunSummary:
         settings.ensure_valid()
-        if self._owns_storage:
-            self.storage = MilvusStore(settings.milvus_uri)
-        if self._owns_search:
-            self.search = LangChainSearch(self.storage, self.embedder)
+        loader = self.loader or DoclingLoader()
+        chunker = self.chunker or HybridChunker()
+        embedder = self.embedder or MiniLMEmbedder()
+        storage = self.storage or MilvusStore(settings=settings)
+        search = self.search or LangChainSearch(storage, embedder)
+
         metrics: dict[str, dict[str, Any]] = {}
         with ExitStack() as stack:
             documents = self._capture_stage(
                 "loader",
                 metrics,
                 settings.metrics_verbose,
-                lambda: self.loader.load(settings),
+                lambda: loader.load(settings),
                 count=lambda docs: len(docs),
+                enrich=lambda docs: {
+                    "strategy": docs[0].strategy if docs else "unknown",
+                },
             )
             chunks = self._capture_stage(
                 "chunker",
                 metrics,
                 settings.metrics_verbose,
-                lambda: self.chunker.split(documents, settings),
+                lambda: chunker.split(documents, settings),
                 count=lambda rows: len(rows),
             )
             embeddings = self._capture_stage(
                 "embedder",
                 metrics,
                 settings.metrics_verbose,
-                lambda: self.embedder.embed(chunks, settings),
+                lambda: embedder.embed(chunks, settings),
                 count=lambda rows: len(rows),
+                enrich=lambda _rows: {
+                    "model": embedder.model_name(settings),
+                    "strategy": "hash" if embedder.using_fallback else "huggingface",
+                },
             )
             storage_handle = self._capture_stage(
                 "storage",
                 metrics,
                 settings.metrics_verbose,
-                lambda: self.storage.persist(embeddings, settings.milvus_collection),
-                count=lambda handle: int(handle.metadata.get("insert_count", "0")),
+                lambda: storage.persist(
+                    embeddings,
+                    settings.milvus_collection,
+                    settings=settings,
+                    embedder=embedder,
+                ),
+                count=lambda handle: int(handle.metadata.get("insert_count", 0)),
                 enrich=lambda handle: {
                     "collection": handle.collection_name,
                     "milvus_uri": handle.milvus_uri,
+                    "mode": handle.metadata.get("mode", ""),
                 },
             )
             stack.callback(storage_handle.teardown)
@@ -97,9 +110,12 @@ class PipelineRunner(RunnerProtocol):
                 "search",
                 metrics,
                 settings.metrics_verbose,
-                lambda: self.search.ask(storage_handle, settings.query_text, settings),
+                lambda: search.ask(storage_handle, settings.query_text, settings),
                 count=lambda result: len(result.sources),
-                enrich=lambda result: {"question": result.question},
+                enrich=lambda result: {
+                    "question": result.question,
+                    "fallback": result.fallback_used,
+                },
             )
         summary = RunSummary(
             documents=documents,
@@ -111,12 +127,14 @@ class PipelineRunner(RunnerProtocol):
         )
         logger.info(
             "Pipeline finished",
-            extra={
-                "documents": len(documents),
-                "chunks": len(chunks),
-                "embeddings": len(embeddings),
-                "hits": len(search_result.sources),
-            },
+            extra=safe_extra(
+                {
+                    "documents": len(documents),
+                    "chunks": len(chunks),
+                    "embeddings": len(embeddings),
+                    "hits": len(search_result.sources),
+                }
+            ),
         )
         return summary
 

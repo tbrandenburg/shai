@@ -57,6 +57,11 @@ def _build_overrides(**kwargs: Any) -> dict[str, str]:
 
 
 def _render_summary(summary: RunSummary, validation_counts: dict[str, int]) -> None:
+    loader_meta = summary.metrics.get("loader", {})
+    embedder_meta = summary.metrics.get("embedder", {})
+    storage_meta = summary.metrics.get("storage", {})
+    search_meta = summary.metrics.get("search", {})
+
     table = Table(title="pyrag pipeline summary", expand=True)
     table.add_column("Metric", style="cyan", no_wrap=True)
     table.add_column("Value", style="magenta")
@@ -64,26 +69,29 @@ def _render_summary(summary: RunSummary, validation_counts: dict[str, int]) -> N
     table.add_row("Chunks", str(validation_counts["chunks"]))
     table.add_row("Embeddings", str(validation_counts["embeddings"]))
     table.add_row("Hits", str(validation_counts["hits"]))
+    table.add_row("Docling Strategy", str(loader_meta.get("strategy", "")))
+    table.add_row("Embedder Model", str(embedder_meta.get("model", "")))
+    table.add_row("Embedder Strategy", str(embedder_meta.get("strategy", "")))
     table.add_row(
         "Collection",
-        summary.metrics.get("storage", {}).get(
-            "collection", summary.settings_snapshot.get("milvus_collection", "")
-        ),
+        storage_meta.get("collection", summary.settings_snapshot.get("milvus_collection", "")),
     )
     table.add_row(
         "Milvus URI",
-        summary.metrics.get("storage", {}).get(
-            "milvus_uri", summary.settings_snapshot.get("milvus_uri", "")
-        ),
+        storage_meta.get("milvus_uri", summary.settings_snapshot.get("milvus_uri", "")),
     )
-    table.add_row("Question", summary.metrics.get("search", {}).get("question", ""))
+    table.add_row("Milvus Mode", str(storage_meta.get("mode", "")))
+    table.add_row("LLM Fallback", "yes" if search_meta.get("fallback") else "no")
+    table.add_row("Question", search_meta.get("question", ""))
     console.print(table)
 
     console.print("[bold]Answer[/bold]:", summary.search_result.answer)
     console.print("[bold]Top sources:[/bold]")
     for source in summary.search_result.sources:
         snippet = (source.text or "").strip().splitlines()[0][:120]
-        console.print(f"  - ({source.score:.2f}) {source.chunk_id}: {snippet}")
+        page = source.metadata.get("page", "?")
+        section = source.metadata.get("section", "?")
+        console.print(f"  - ({source.score:.2f}) {source.chunk_id} p{page} {section}: {snippet}")
 
 
 @app.command("run", help="Execute the modular RAG pipeline end-to-end.")

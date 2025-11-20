@@ -32,5 +32,18 @@ def validate(summary: RunSummary) -> dict[str, int]:
     for key, minimum in REQUIRED_THRESHOLDS.items():
         if counts[key] < minimum:
             raise ValidationError(f"Validation failed: {key} below minimum {minimum}.")
-    logger.info("Validation passed for collection %s", summary.search_result.top_k)
+
+    validation_enabled = bool(summary.settings_snapshot.get("validation_enabled", True))
+    if validation_enabled:
+        loader_strategy = summary.metrics.get("loader", {}).get("strategy")
+        if loader_strategy == "fallback":
+            raise ValidationError("Loader fallback not permitted when validation is enabled.")
+        embedder_strategy = summary.metrics.get("embedder", {}).get("strategy")
+        if embedder_strategy and embedder_strategy != "huggingface":
+            raise ValidationError("Embedder must use HuggingFace strategy during validation runs.")
+        if summary.search_result.fallback_used:
+            raise ValidationError(
+                "LLM fallback triggered; rerun with a reachable HuggingFaceEndpoint."
+            )
+    logger.info("Validation passed for retrieval depth %s", summary.search_result.top_k)
     return counts

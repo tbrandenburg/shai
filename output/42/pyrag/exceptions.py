@@ -23,6 +23,10 @@ class StorageError(PyragError):
     """Raised for Milvus/Lite persistence issues."""
 
 
+class MilvusConnectionError(StorageError):
+    """Raised when Milvus cannot be reached or initialized."""
+
+
 class SearchError(PyragError):
     """Raised when retrieval/search cannot produce useful answers."""
 
@@ -37,6 +41,7 @@ __all__ = [
     "ChunkerError",
     "EmbedderError",
     "StorageError",
+    "MilvusConnectionError",
     "SearchError",
     "ValidationError",
 ]

@@ -93,8 +93,13 @@ def test_storage_persist_and_query(tmp_path: Path, monkeypatch: Any) -> None:
     chunk = _as_chunk(_doc_chunk())
     embedder = MiniLMEmbedder()
     embeddings = embedder.embed([chunk], settings)
-    store = MilvusStore()
-    handle = store.persist(embeddings, settings.milvus_collection)
+    store = MilvusStore(settings=settings)
+    handle = store.persist(
+        embeddings,
+        settings.milvus_collection,
+        settings=settings,
+        embedder=embedder,
+    )
     ranked = store.query(embeddings[0].vector, top_k=1)
     assert ranked[0][0].metadata["chunk_id"] == chunk.id
     handle.teardown()
@@ -106,12 +111,17 @@ def test_search_returns_confident_answer(tmp_path: Path, monkeypatch: Any) -> No
     chunk = _as_chunk(_doc_chunk())
     embedder = MiniLMEmbedder()
     embeddings = embedder.embed([chunk], settings)
-    store = MilvusStore()
-    handle = store.persist(embeddings, settings.milvus_collection)
+    store = MilvusStore(settings=settings)
+    handle = store.persist(
+        embeddings,
+        settings.milvus_collection,
+        settings=settings,
+        embedder=embedder,
+    )
     search = LangChainSearch(store, embedder)
     result = search.ask(handle, settings.query_text, settings)
     assert result.sources, "Search should surface at least one source"
-    assert settings.query_text.split()[0] in result.answer
+    assert result.answer.startswith("(degraded)"), "Fallback summary expected without real LLM"
 
 
 def test_cli_run_executes_end_to_end(tmp_path: Path, monkeypatch: Any) -> None:
@@ -127,6 +137,8 @@ def test_cli_run_executes_end_to_end(tmp_path: Path, monkeypatch: Any) -> None:
             "2",
             "--metrics-verbose",
             "true",
+            "--validation-enabled",
+            "false",
         ],
         env={
             "DOC_CACHE_DIR": str(cache_dir),

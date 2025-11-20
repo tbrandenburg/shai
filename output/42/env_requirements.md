@@ -1,60 +1,61 @@
-# Feature 3 – Environment Requirements
+# Feature 4 – Environment Requirements
 
 ## Objective
-- Collapse the external configuration surface so that only nine vetted environment variables remain user-facing while every other setting is enforced internally by the `pyrag` package.
-- Preserve the Feature 2 loader→chunker→embedder→storage→search pipeline behavior (`uv run pyrag`) and keep linting/testing guarantees intact as called out in `uv_requirements.md` and `rag_requirements.md`.
-- Provide a single source of truth for `.env.example`, `pyrag/config.py`, and downstream architecture/design docs so subsequent phases cannot re‑introduce ad-hoc variables.
+- Preserve the strict nine-variable contract introduced in Feature 3 while documenting how each setting now drives the reinstated Docling → LangChain → Milvus pipeline implemented in Feature 4.
+- Clarify how `.env.example`, `pyrag/config.py`, `README.md`, and CLI help text stay synchronized so operators can run `uv run pyrag run` without guessing about Docling caches, Milvus Lite folders, or HuggingFaceEndpoint behavior.
+- Provide a concrete sample run (using `uv run pyrag run --validation-enabled false`) so QA and documentation reviewers can reference the telemetry emitted by the restored LangChain integrations.
 
 ## Inputs & Traceability
-- Issue context and stakeholder directive to "heavily reduce" env vars (`issue_conversation.md`).
-- Packaging scope/acceptance criteria (`uv_requirements.md`).
-- Modular pipeline requirements (`rag_requirements.md`) and design blueprint (`rag_design.md`).
-- Current `.env.example` plus parsing rules in `pyrag/config.py`.
+- Feature 4 requirement/design artifacts: `lib_requirements.md`, `lib_architecture.md`, `lib_design.md`.
+- Implementation evidence: `lib_build_log.md`, updated `pyrag/*.py` modules, `tests/*.py`.
+- Prior environment governance: `env_architecture.md`, `env_design.md`, `.env.example`.
+- Sample CLI execution captured while drafting this update (included below) to anchor telemetry expectations.
 
 ## Approved External Variables
-Only the variables below may appear in `.env.example`, be parsed inside `pyrag/config.py`, or be referenced in docs/CLI help. All names are uppercase with snake_case, mirroring existing usage.
+Only the variables below may appear in `.env.example`, be parsed by `pyrag/config.py`, or surface in documentation/CLI help. The Module Owner column now references the real Feature 4 components.
 
-| Name | Default | Acceptable Range / Format | Validation & Fallbacks | Module Owner | Business Rationale |
+| Name | Default | Acceptable Range / Format | Validation & Fallbacks | Module Owner | Feature 4 Behavior |
 | --- | --- | --- | --- | --- | --- |
-| `DOC_CACHE_DIR` | `.pyrag_cache` | Relative or absolute path writable by the CLI; must resolve on local filesystem. | Config creates the directory if missing; failure if path exists but is not writable. | Loader / Pipeline infra | Keeps the only file-path knob user-facing so large Docling PDFs can be cached wherever storage policies allow. |
-| `MILVUS_URI` | *(empty)* | Blank or URI pointing to Milvus Lite (`file://`), local socket, or remote Milvus endpoint. | Blank ⇒ pipeline provisions a temp Milvus Lite path inside `DOC_CACHE_DIR`; custom URIs validated for supported schemes before storage init. | Storage module | The lone connectivity control users still need (per `rag_architecture.md`), allowing BYO Milvus while defaulting to self-managed Lite. |
-| `MILVUS_COLLECTION` | `pyrag_docs` | Alphanumeric plus underscores, ≤ 64 chars. | Validation enforces regex `^[A-Za-z0-9_]+$`; invalid values fall back to default and trigger a warning in CLI logs. | Storage module | Lets advanced users isolate datasets without editing code while guarding naming hygiene. |
-| `TOP_K` | `5` | Integer 1–20 (recommended upper bound keeps retrieval latency acceptable). | Config casts to `int`, ensures `≥ 1`; values >20 log a warning but cap at 20 to avoid runaway costs. | Search / Validation | Directly controls retrieved answer breadth; still crucial for experimentation and aligns with FR-R2/FR-V1. |
-| `CHUNK_SIZE` | `1000` | Integer 200–2000 tokens/characters. | Must be `> 0`; enforced to remain `> CHUNK_OVERLAP`; values outside range clamped with warning. | Chunker | Operators occasionally adjust chunk sizing for corpora, so this remains tunable for Docling/HybridChunker parity. |
-| `CHUNK_OVERLAP` | `200` | Integer 0–(CHUNK_SIZE − 1). | Validation ensures non-negative, `< CHUNK_SIZE`; invalid entries revert to default 200. | Chunker | Governs continuity between chunks; keeping it configurable preserves recall tuning without exposing every chunker knob. |
-| `LOG_LEVEL` | `INFO` | One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. Case-insensitive. | Invalid values default to `INFO` while emitting a warning; CLI prints the active level at startup. | Pipeline logging (`pyrag/logging.py`) | Provides the single permitted observability setting to match PEP8/Ruff-friendly logging discipline. |
-| `VALIDATION_ENABLED` | `true` | Boolean strings `{true,false,1,0,yes,no,on,off}`. | Parsed once; defaults to `true`. When set `false`, CLI logs a warning and skips `pyrag.validation.validate`. | Validation module | Keeps governance knob for CI and smoke tests while enabling future task-machine stages to toggle validation only when necessary. |
-| `METRICS_VERBOSE` | `false` | Same boolean parsing as above. | When `true`, modules emit extended metrics tables; when `false`, only summaries appear. Default `false` protects readability. | Pipeline / Observability | Allows advanced operators to request richer telemetry without reintroducing dozens of bespoke env vars. |
-
-### Additional Notes
-- All numeric fields will raise `ValueError` before pipeline start if parsing fails, ensuring `.env` mistakes surface before resource-intensive stages run (aligning with `pyrag/config.py` behavior).
-- `.env.example` must list only the rows above, in the order shown, each with inline comments describing purpose/expected range.
-- Typer CLI help and README configuration sections must mirror this table to remain contractually consistent.
+| `DOC_CACHE_DIR` | `.pyrag_cache` | Writable path on the local filesystem. | Created when missing; loader raises if not writable. | Loader / Pipeline infra | Stores Docling-exported JSON, downloaded PDFs, Milvus Lite files, and HuggingFace model weights. |
+| `MILVUS_URI` | *(empty)* | Blank or URI pointing to Milvus Lite (`file://`), ipc/tcp URIs, or remote Milvus endpoints. | Blank ⇒ auto-provisioned Milvus Lite path under `DOC_CACHE_DIR`; invalid URIs raise `MilvusConnectionError`. | Storage module | Determines whether LangChain uses embedded Milvus Lite vs. remote Milvus; telemetry records `milvus_mode`. |
+| `MILVUS_COLLECTION` | `pyrag_docs` | Alphanumeric with underscores, ≤ 64 chars. | Regex validated; invalid values reset to default with warning. | Storage module | Names the Milvus collection passed to LangChain's `Milvus` vectorstore. |
+| `TOP_K` | `5` | Integer 1–20. | Cast-to-int; values outside range clamp and warn. | Search / Validation | Drives retriever `search_kwargs` and validation thresholds for minimum hits. |
+| `CHUNK_SIZE` | `1000` | Integer 200–2000. | Enforced to remain `> 0` and `> CHUNK_OVERLAP`; clamp with warning. | Chunker | Controls Docling HybridChunker window length when chunking `DocChunk` payloads. |
+| `CHUNK_OVERLAP` | `200` | Integer 0–(CHUNK_SIZE − 1). | Enforced to remain non-negative and `< CHUNK_SIZE`; invalid entries revert to 200. | Chunker | Maintains continuity for Docling/Markdown chunkers; surfaced in chunker metrics. |
+| `LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR/CRITICAL (case-insensitive). | Invalid values fall back to INFO and trigger a warning. | Logging / Pipeline | Feeds `pyrag.logging.configure`, which now formats telemetry dictionaries for Docling/Milvus metadata. |
+| `VALIDATION_ENABLED` | `true` | Boolean strings `{true,false,1,0,yes,no,on,off}`. | Parsed once; default true. When false, CLI skips validation but still records metrics. | Validation module | Governs whether LLM fallback is treated as fatal. Feature 4 validation fails when HuggingFaceEndpoint falls back while the flag is true. |
+| `METRICS_VERBOSE` | `false` | Same boolean parsing as above. | Adds per-stage telemetry rows when true. | Pipeline / Observability | Surfaces Docling strategy, embedding model/strategy, Milvus URI/redaction, and HuggingFace fallback status. |
 
 ## Internalized / Derived Settings
-The following legacy environment variables are now **internal-only**. Implementers must hard-code these defaults inside `pyrag/config.py` (or compute them from the remaining nine variables) and remove them from `.env.example`. Any overrides must flow through future CLI options or developer-only hooks, not public env vars.
+The following values remain internal-only. They are mentioned here for completeness because documentation now references the real LangChain/Docling components they power.
 
-| Legacy Variable(s) | Handling Strategy | Default / Source | Notes & Owning Module |
+| Legacy Variable(s) | Handling Strategy | Default / Source | Feature 4 Notes |
 | --- | --- | --- | --- |
-| `SOURCE_URL` | Constant inside `PipelineSettings`; override requires code change or future CLI flag reserved for maintainers. | `https://arxiv.org/pdf/2408.09869` (Docling Technical Report). | Keeps loader deterministic and prevents users from pointing at arbitrary PDFs without design review, per `rag_requirements.md` FR-L1. |
-| `EXPORT_TYPE` | Locked to `ExportType.DOC_CHUNKS`. | `DOC_CHUNKS`. | Aligns with architecture expectation that DOC_CHUNKS remains default; alternate modes now require code-level change vetted by architects. |
-| `SOURCE_HEADERS` | Derived from a curated allowlist inside loader (likely empty). | `{}` by default. | Prevents misconfigured auth headers; loader may still compute headers when DOC_CACHE_DIR indicates cached copy. |
-| `QUERY_TEXT` | Embedded in `PipelineSettings` default question; future customization handled via CLI option rather than env var. | "Which are the main AI models in Docling?" | Maintains reproducible validation metrics requested in Feature 2 QA. |
-| `HF_TOKEN` / generation model knobs | Removed from public config; CLI will auto-detect token from system key store or treat generation as optional, always avoiding crashes when absent. | `None`. | Issue #42 explicitly says no HuggingFace token required; keeping it internal avoids recurring support tickets. |
-| `PROMPT`, `GEN_MODEL_ID`, LangChain chain params | Codified inside `pyrag/search.py` defaults. | Values from current implementation (PromptTemplate, `mistralai/Mistral-7B-Instruct-v0.2`). | Maintains parity with Feature 2 while ensuring search pipeline changes go through code review rather than ops tweaks. |
-| `INDEX_TYPE`, `METRIC_TYPE`, other Milvus tunables | Stored as constants within `pyrag/storage.py` (e.g., `FLAT`, `COSINE`). | Derived from design blueprint. | Eliminates misalignment between QA and prod by freezing storage topology unless architects explicitly change it. |
-| Test/CI toggles (e.g., `PYRAG_TEST_MODE`) | Internal to pytest fixtures or Typer options; not documented to end users. | Managed by tests. | Prevents confusion for CLI operators while retaining developer ergonomics inside `tests/`. |
+| `SOURCE_URL` | Constant inside `PipelineSettings`. | `https://arxiv.org/pdf/2408.09869`. | Loader downloads this PDF through DoclingLoader, caching JSON under `DOC_CACHE_DIR/docling_source.json`. |
+| `EXPORT_TYPE` | Locked to `ExportType.DOC_CHUNKS`. | `DOC_CHUNKS`. | Required by the Docling HybridChunker integration; fallback Markdown splitter still respects chunk size/overlap env knobs. |
+| `QUERY_TEXT` | Embedded default question. | "Which are the main AI models in Docling?" | Appears in CLI telemetry; tests override via Typer option rather than env var. |
+| HuggingFace tokens/model IDs | Internal to `PipelineSettings`. | Model defaults: `sentence-transformers/all-MiniLM-L6-v2` (embeddings) and `mistralai/Mistral-7B-Instruct-v0.2` (LLM). | Feature 4 search pipeline instantiates HuggingFaceEndpoint without requiring a token; fallback summarizer runs when the endpoint is unreachable. |
+| Milvus index settings | Hard-coded constants. | `FLAT` index, cosine metric. | Documented in `lib_design.md`; sanitized values appear in CLI metrics but have no env knobs. |
 
 ## Governance & Validation Rules
-- `pyrag/config.py` must be updated so `PipelineSettings.from_env()` only inspects the nine approved variable names; any other keys are ignored with a debug log for traceability.
-- `.env.example`, README, and Typer help text must stay synchronized with this document. Any future env addition requires updating this file first and re-running the Feature 3 pipeline gates.
-- Feature 3 QA will verify:
-  1. Setting each numeric/boolean variable to out-of-range values triggers the documented validation behavior (clamp, warning, or hard fail) while `uv run pyrag` exits non-zero for fatal misconfigurations.
-  2. `env_requirements.md` → `env_architecture.md` → `env_design.md` traceability remains intact (each doc must cite the previous one).
-  3. Build/test logs (`env_build_log.md`, `env_test_results.md`) explicitly reference changes to `.env.example` and `pyrag/config.py` to prove compliance.
-- Module owners listed above are accountable for documenting how their component interprets the variable during architecture/design/implementation phases.
+1. `.env.example`, `README.md`, CLI help, and this document must continue to describe the exact same nine-variable surface.
+2. When QA enables `VALIDATION_ENABLED=true`, they expect Docling loader strategy `docling`, embedding strategy `huggingface`, and search fallback `false`. Any fallback flips validation to non-zero exit, so documentation must instruct operators to disable validation when intentionally running offline.
+3. Documentation engineers must cite this file when describing configuration in other artifacts (e.g., `lib_docs.md`).
 
-## Next Steps for Downstream Agents
-1. Architecture phase (`env_architecture.md`) should describe how configuration is loaded from `.env` → Typer overrides → internal defaults while respecting the narrowed surface and secret-handling guidance for `MILVUS_URI`.
-2. Design phase must specify precise edits to `.env.example`, `pyrag/config.py`, `pyrag/pipeline.py`, and documentation to implement these requirements.
-3. Implementation/testing phases must log all configuration-related commands inside `env_build_log.md`/`env_test_results.md` for auditability.
+## Sample Execution Trace
+To capture the telemetry emitted by the real pipeline, run:
+
+```
+uv run pyrag run --validation-enabled false
+```
+
+The 2025-11-20 run produced:
+
+- Loader: `strategy=docling`, 1 document cached under `.pyrag_cache`.
+- Chunker: 1 chunk via Docling HybridChunker (strategy `docling`).
+- Embedder: `sentence-transformers/all-MiniLM-L6-v2`, `strategy=huggingface`.
+- Storage: Milvus Lite at `file://.../.pyrag_cache/milvus-lite`, mode `lite`, collection `pyrag_docs`.
+- Search: HuggingFaceEndpoint fallback triggered (`LLM Fallback: yes`), producing a deterministic `(degraded)` answer while still listing sources.
+- Validation: skipped (flag false); when true, fallback would raise `ValidationError` instructing the operator to re-run with a reachable HuggingFaceEndpoint or to disable validation explicitly.
+
+Use this trace when updating README snippets, env documentation, or future QA guides so every reference shares a consistent, validated source of truth.

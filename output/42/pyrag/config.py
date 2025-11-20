@@ -58,6 +58,13 @@ DEFAULT_EXPORT_TYPE = ExportType.DOC_CHUNKS
 DEFAULT_HEADERS: dict[str, str] = {}
 DEFAULT_QUERY_TEXT = "Which are the main AI models in Docling?"
 DEFAULT_HF_TOKEN: str | None = None
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_LLM_REPO_ID = "mistralai/Mistral-7B-Instruct-v0.2"
+DEFAULT_PROMPT_TEMPLATE = (
+    "You are a Docling specialist. Use the provided context to answer the question.\n"
+    "Context:\n{context}\n\nQuestion: {question}\nAnswer:"
+)
+DOC_SOURCE_FILENAME = "docling_source.json"
 
 
 @dataclass(slots=True)
@@ -79,6 +86,40 @@ class PipelineSettings:
     query_text: str = DEFAULT_QUERY_TEXT
     hf_token: str | None = DEFAULT_HF_TOKEN
 
+    @property
+    def docling_source_path(self) -> Path:
+        """Cache file path used to persist Docling exports locally."""
+
+        return self.doc_cache_dir / DOC_SOURCE_FILENAME
+
+    @property
+    def docling_source_url(self) -> str:
+        return self.source_url
+
+    @property
+    def docling_headers(self) -> dict[str, str]:
+        return dict(self.headers)
+
+    @property
+    def docling_export_type(self) -> ExportType:
+        return self.export_type
+
+    @property
+    def hf_repo_id(self) -> str:
+        return DEFAULT_LLM_REPO_ID
+
+    @property
+    def hf_embedding_model(self) -> str:
+        return DEFAULT_EMBEDDING_MODEL
+
+    @property
+    def prompt_template(self) -> str:
+        return DEFAULT_PROMPT_TEMPLATE
+
+    @property
+    def milvus_mode(self) -> str:
+        return "lite" if self.milvus_uri.startswith("file://") else "remote"
+
     def snapshot(self) -> dict[str, str]:
         """Return a sanitized dict representation for logging/telemetry."""
 
@@ -87,6 +128,10 @@ class PipelineSettings:
         snapshot["export_type"] = self.export_type.value
         snapshot["milvus_uri"] = redact_uri(self.milvus_uri)
         snapshot["hf_token"] = "***" if self.hf_token else ""
+        snapshot.setdefault("docling_version", "")
+        snapshot["hf_model"] = self.hf_embedding_model
+        snapshot["hf_repo_id"] = self.hf_repo_id
+        snapshot["milvus_mode"] = self.milvus_mode
         return snapshot
 
     def ensure_valid(self) -> None:
