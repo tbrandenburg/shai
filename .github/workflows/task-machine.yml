@@ -83,7 +83,6 @@ jobs:
           sudo apt-get install -y ripgrep
 
       - name: Install sst/opencode
-        if: ${{ steps.admin.outputs.is_admin == 'true' }}
         run: |
           set -euo pipefail
           INSTALL_DIR="$HOME/.opencode/bin"
@@ -91,10 +90,10 @@ jobs:
 
           TMPDIR="$(mktemp -d)"
           trap 'rm -rf "$TMPDIR"' EXIT
-          ZIP_PATH="$TMPDIR/opencode.zip"
+          ARCHIVE_PATH="$TMPDIR/opencode.tar.gz"
 
-          curl -fsSL "https://github.com/sst/opencode/releases/latest/download/opencode-linux-x64.zip" -o "$ZIP_PATH"
-          unzip -q "$ZIP_PATH" -d "$TMPDIR"
+          curl -fsSL "https://github.com/sst/opencode/releases/latest/download/opencode-linux-x64.tar.gz" -o "$ARCHIVE_PATH"
+          tar -xzf "$ARCHIVE_PATH" -C "$TMPDIR"
           install "$TMPDIR/opencode" "$INSTALL_DIR/opencode"
 
           echo "$INSTALL_DIR" >> "$GITHUB_PATH"
