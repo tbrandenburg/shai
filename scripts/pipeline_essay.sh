@@ -1,34 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TOPIC="${1:-}"
+# IMPORTANT: This script has been updated to support --id and --file arguments
+# for consistency with the new 'shai' unified CLI.
 
-if [[ -z "$TOPIC" ]]; then
-  echo "Usage: $0 \"Essay topic\""
-  exit 1
+INPUT_ARG=""
+ID_ARG=""
+CONTEXT_FILE=""
+
+# Parse arguments for flexible usage
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --id)
+      ID_ARG="$2"
+      shift 2
+      ;;
+    --file)
+      CONTEXT_FILE="$2"
+      shift 2
+      ;;
+    *)
+      if [[ -z "$INPUT_ARG" ]]; then
+        INPUT_ARG="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Set output directory with optional ID suffix
+# Default if no ID is provided (e.g., if run directly without 'shai' wrapper)
+if [[ -n "$ID_ARG" ]]; then
+  OUTPUT_DIR="output/essay-${ID_ARG}"
+else
+  OUTPUT_DIR="output/essay-$(date +%Y%m%d-%H%M%S)" # Fallback auto-ID
 fi
-
-#############################################
-# CONFIGURATION — Input/Output per agent
-#############################################
-
-OUTPUT_DIR="output"
 mkdir -p "$OUTPUT_DIR"
 
-PLANNER_INPUT=""
-PLANNER_OUTPUT="$OUTPUT_DIR/plan.md"
-
-WRITER_INPUT="$PLANNER_OUTPUT"
-WRITER_OUTPUT="$OUTPUT_DIR/essay.md"
-
-REVIEWER_INPUT="$WRITER_OUTPUT"
-REVIEWER_OUTPUT="$OUTPUT_DIR/review.md"
-
-
-#############################################
 # Helper: Mandatory output enforcement
-#############################################
-
 require_file() {
   local filename="$1"
   if [[ ! -f "$filename" ]]; then
@@ -37,100 +46,90 @@ require_file() {
   fi
 }
 
-#############################################
-# Clean up previous outputs
-#############################################
+# Determine the essay topic content
+ESSAY_TOPIC_CONTENT=""
+if [[ -n "$CONTEXT_FILE" ]]; then
+  ESSAY_TOPIC_CONTENT=$(<"$CONTEXT_FILE") # Read file content
+elif [[ -n "$INPUT_ARG" ]]; then
+  ESSAY_TOPIC_CONTENT="$INPUT_ARG"
+else
+  echo "Error: No essay topic provided. Use 'shai essay \"Your topic\"' or 'shai essay --file topic.txt'."
+  exit 1
+fi
 
-# Clean up previous output files
-rm -f "$OUTPUT_DIR/plan.md" "$OUTPUT_DIR/essay.md" "$OUTPUT_DIR/review.md"
+# Write the essay topic to a file for consistent file-based processing
+TOPIC_FILE="$OUTPUT_DIR/essay_topic.txt"
+echo "$ESSAY_TOPIC_CONTENT" > "$TOPIC_FILE"
+echo "Essay topic saved to $TOPIC_FILE"
 
-#############################################
-# STEP 1 — PLANNER (must use web search)
-#############################################
+# Define files for agent stages, using the OUTPUT_DIR
+PLAN_FILE="$OUTPUT_DIR/essay_plan.md"
+ESSAY_DRAFT_FILE="$OUTPUT_DIR/essay_draft.md"
+FINAL_ESSAY_FILE="$OUTPUT_DIR/essay_final.md"
 
-echo "Running Planner..."
 
-PLANNER_PROMPT="You are the **PLANNING STAGE** of a writing pipeline.
+echo "--- Running Essay Pipeline (ID: ${ID_ARG:-auto-generated}) ---"
+
+# Stage 1: Planner Agent
+read -r -d '' PLANNER_PROMPT <<EOF || true
+You are the **ESSAY PLANNER**.
 
 MANDATORY BEHAVIOR:
-- You MUST perform a quick web search (keep them concise and targeted).
-- You MUST cite sources and incorporate findings into your outline.
-- You MUST use MCP tools to write the final outline to: \`${PLANNER_OUTPUT}\`
-- TIMEOUT SAFETY: Keep your searches focused and avoid overly long operations.
-- You MUST NOT finish without creating \`${PLANNER_OUTPUT}\`.
+- You MUST read the user's essay topic from the file: \`${TOPIC_FILE}\`
+- You MUST create a detailed plan for the essay, including structure, key arguments, and points to cover.
+- You MUST write the plan to the file: \`${PLAN_FILE}\`
+- The plan should be clear, concise, and structured with markdown headings.
 
-TASK:
-- Create a hierarchical outline for: \"${TOPIC}\"
-- Base it on your web research.
-- Keep your text response brief.
+TASK: Create an essay plan based on the topic in \`${TOPIC_FILE}\`.
+EOF
 
-Essay Topic: \"${TOPIC}\""
-
+echo "Running Planner Agent..."
 opencode run "$PLANNER_PROMPT"
-
-require_file "$PLANNER_OUTPUT"
-echo "Planner completed and produced: ${PLANNER_OUTPUT}"
-echo ""
+require_file "$PLAN_FILE"
+echo "Planner completed. Plan saved to $PLAN_FILE"
 
 
-#############################################
-# STEP 2 — WRITER (must use web search)
-#############################################
-
-echo "Running Writer..."
-
-WRITER_PROMPT="You are the **WRITING STAGE** of a writing pipeline.
+# Stage 2: Writer Agent
+read -r -d '' WRITER_PROMPT <<EOF || true
+You are the **ESSAY WRITER**.
 
 MANDATORY BEHAVIOR:
-- You MUST read the outline from: \`${PLANNER_OUTPUT}\`
-- You MUST perform targeted web searches for factual information and evidence.
-- TIMEOUT SAFETY: Keep searches concise; focus on 2-3 key topics per search.
-- You MUST use MCP tools to write the essay to: \`${WRITER_OUTPUT}\`
-- You MUST NOT finish without creating \`${WRITER_OUTPUT}\`.
+- You MUST read the essay plan from: \`${PLAN_FILE}\`
+- You MUST write a comprehensive essay based on this plan.
+- You MUST write the essay to the file: \`${ESSAY_DRAFT_FILE}\`
+- The essay should be well-structured, coherent, and follow academic writing standards.
+- DO NOT include an introduction like "Based on the plan..." just write the essay content.
+- DO NOT include "Conclusion" or "References" unless specifically instructed in the plan.
 
-TASK:
-- Write a detailed essay in Markdown based on the outline and research.
-- Keep your text response brief."
+TASK: Write the essay following the plan in \`${PLAN_FILE}\`.
+EOF
 
+echo "Running Writer Agent..."
 opencode run "$WRITER_PROMPT"
-
-require_file "$WRITER_OUTPUT"
-echo "Writer completed and produced: ${WRITER_OUTPUT}"
-echo ""
+require_file "$ESSAY_DRAFT_FILE"
+echo "Writer completed. Draft saved to $ESSAY_DRAFT_FILE"
 
 
-#############################################
-# STEP 3 — REVIEWER (NO web search allowed)
-#############################################
-
-echo "Running Reviewer..."
-
-REVIEWER_PROMPT="You are the **REVIEW STAGE** of a writing pipeline.
+# Stage 3: Reviewer Agent
+read -r -d '' REVIEWER_PROMPT <<EOF || true
+You are the **ESSAY REVIEWER**.
 
 MANDATORY BEHAVIOR:
-- You MUST read the essay from: \`${WRITER_OUTPUT}\`
-- You MUST NOT perform any web searches.
-- You MUST use MCP tools to write the revised essay to: \`${REVIEWER_OUTPUT}\`
-- You MUST NOT finish without creating \`${REVIEWER_OUTPUT}\`.
+- You MUST read the original essay plan from: \`${PLAN_FILE}\`
+- You MUST read the essay draft from: \`${ESSAY_DRAFT_FILE}\`
+- You MUST critically review the essay against the plan, checking for completeness, coherence, factual accuracy (if implied), grammar, and style.
+- You MUST provide constructive feedback. If changes are needed, you MUST rewrite/refine the essay entirely, incorporating your suggestions.
+- If the essay is already excellent and needs no changes, state that and output the original essay content as the final output.
+- You MUST write the final, reviewed essay (or the original if no changes) to the file: \`${FINAL_ESSAY_FILE}\`
 
-TASK:
-- Review the essay for structure, clarity, logic, and coherence.
-- Revise and improve it.
-- Keep your text response brief."
+TASK: Review and refine the essay draft based on the plan.
+EOF
 
+echo "Running Reviewer Agent..."
 opencode run "$REVIEWER_PROMPT"
+require_file "$FINAL_ESSAY_FILE"
+echo "Reviewer completed. Final essay saved to $FINAL_ESSAY_FILE"
 
-require_file "$REVIEWER_OUTPUT"
-echo "Reviewer completed and produced: ${REVIEWER_OUTPUT}"
-echo ""
-
-
-#############################################
-# DONE
-#############################################
-
-echo "Pipeline finished successfully!"
-echo "Generated files:"
-echo "  $PLANNER_OUTPUT"
-echo "  $WRITER_OUTPUT"
-echo "  $REVIEWER_OUTPUT"
+echo "--- Essay Pipeline Finished ---"
+echo "Final output is in: $FINAL_ESSAY_FILE"
+```
