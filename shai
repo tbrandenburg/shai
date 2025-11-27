@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# shai - A unified CLI for SHAI pipelines
+
+set -euo pipefail
+
+# --- Configuration ---
+# Map pipeline types to their script paths
+declare -A PIPELINES=(
+  ["task"]="./scripts/pipeline_task_machine.sh"
+  ["essay"]="./scripts/pipeline_essay.sh"
+  # Add more pipelines here as they are created
+)
+
+# --- Helper Functions ---
+generate_id() {
+  date +%Y%m%d-%H%M%S-%N | cut -c1-22 # YYYYMMDD-HHMMSS-NNNNNNNNN (approx. 22 chars)
+}
+
+usage() {
+  echo "Usage: shai <pipeline_type> <prompt_text | --file <path>> [--id <identifier>]"
+  echo ""
+  echo "Available pipeline types:"
+  for type in "${!PIPELINES[@]}"; do
+    echo "  - $type"
+  done | sort # Sort for consistent output
+  echo ""
+  echo "Examples:"
+  echo "  shai task \"Create a weather dashboard app\""
+  echo "  shai task --file requirements.md --id project-456"
+  echo "  shai essay \"Scouts in Sweden\""
+  echo "  shai essay --file essay_topic.txt --id ai-education-report"
+  exit 1
+}
+
+# --- Main Logic ---
+
+# Check if any arguments are provided or if --help is requested
+if [[ "$#" -eq 0 ]] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+  usage
+fi
+
+# Initialize variables
+pipeline_type=""
+input_source="" # Either "text" or "file"
+input_value=""
+pipeline_id=""
+
+# Parse pipeline type
+pipeline_type="$1"
+shift
+
+if [[ ! -v "PIPELINES[$pipeline_type]" ]]; then
+  echo "Error: Unknown pipeline type '$pipeline_type'."
+  usage
+fi
+
+# Parse remaining arguments
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --id)
+      if [[ -n "$pipeline_id" ]]; then echo "Error: --id specified multiple times."; usage; fi
+      pipeline_id="$2"
+      shift 2
+      ;;
+    --file)
+      if [[ -n "$input_value" ]]; then echo "Error: Input already provided (text or --file)."; usage; fi
+      if [[ ! -f "$2" ]]; then echo "Error: Input file '$2' not found."; exit 1; fi
+      input_source="file"
+      input_value="$2"
+      shift 2
+      ;;
+    *)
+      if [[ -n "$input_value" ]]; then echo "Error: Multiple text inputs provided."; usage; fi
+      input_source="text"
+      input_value="$1"
+      shift
+      ;;
+  esac
+done
+
+# Ensure input is provided
+if [[ -z "$input_value" ]]; then
+  echo "Error: No input provided for the pipeline."
+  usage
+fi
+
+# If no ID provided, generate one
+if [[ -z "$pipeline_id" ]]; then
+  pipeline_id=$(generate_id)
+fi
+
+# Construct the command for the specific pipeline script
+script_path="${PIPELINES[$pipeline_type]}"
+declare -a script_args=()
+
+# All pipeline scripts should now uniformly accept --id and either a positional argument or --file.
+# The existing pipeline_task_machine.sh already does this.
+# The pipeline_essay.sh will be modified to do this.
+
+if [[ "$input_source" == "file" ]]; then
+  script_args+=("--file" "$input_value")
+else
+  script_args+=("$input_value")
+fi
+script_args+=("--id" "$pipeline_id") # Pass the ID to the underlying script
+
+echo "--- SHAI RUN ---"
+echo "Pipeline: $pipeline_type (ID: $pipeline_id)"
+echo "Input: $input_source ('$input_value')"
+echo "Executing: $script_path ${script_args[@]}"
+echo "----------------"
+
+# Execute the target pipeline script
+exec "$script_path" "${script_args[@]}"
+```
