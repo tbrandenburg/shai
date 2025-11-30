@@ -73,7 +73,7 @@ jobs:
 
       - name: Install pytest
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
-        run: uv pip install pytest
+        run: uv pip install --system pytest
 
       - name: Install ripgrep
         if: ${{ steps.admin.outputs.is_admin == 'true' }}
