@@ -294,6 +294,10 @@ Agents are small, replaceable, debuggable, and transparent.
 -   Any CLI-based LLM runner
 -   Optional MCP tools for file writing
 
+## ⚠️ Important Disclaimer
+
+**For experimental use only; using this script as a bot in violation of any service's terms is prohibited and may be illegal.**
+
 ## 🙌 Contributing
 
 PRs and issues welcome!
