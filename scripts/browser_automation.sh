@@ -41,6 +41,7 @@ After ANY interaction that could change authentication (login, page navigation, 
 - Use HTML parsing and text extraction instead of DOM manipulation
 - JavaScript calls often timeout - HTML reading is more reliable
 - Only use JavaScript for actions that require interaction (clicks, form submissions)
+- AS LAST RESORT: Take screenshots using playwright_browser_screenshot for visual analysis when HTML parsing fails
 
 ### Step 4: SESSION LIFECYCLE
 - Save session state before closing
