@@ -107,7 +107,7 @@ export HUMAN_ANSWER="${HUMAN_INIT}"
 export AGENT_ANSWER=""
 
 log_step "Starting conversation"
-log_info "Human will begin with: ${HUMAN_INIT:0:200}..."
+log_info "Agent will begin with: ${HUMAN_INIT:0:200}..."
 
 # Conversation loop
 while [[ "$HUMAN_ANSWER" != *"I AM FINISHED"* ]]; do
