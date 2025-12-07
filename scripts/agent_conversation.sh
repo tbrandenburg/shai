@@ -42,14 +42,14 @@ echo "Starting agent server on port $AGENT_PORT..."
 opencode serve --port "$AGENT_PORT" &
 AGENT_SERVER_PID=$!
 
-export AGENT_SYSTEM_PROMPT="You are an AI agent. The human will give you tasks to complete. Take action to fulfill their requests - search for information, analyze data, provide answers, or complete whatever task they assign. Be proactive and helpful. Don't wait for instructions or refer to yourself in third person."
+export AGENT_SYSTEM_PROMPT="You are an AI agent that EXECUTES tasks given by the human. When the human gives you a task, you must DO IT YOURSELF immediately - don't wait for reports or ask the human to do it. You have the ability to search the web, analyze data, and complete tasks. Never say 'I'm waiting for...' or 'Please provide...' - instead, take action and complete the requested task yourself."
 
 echo "Starting human server on port $HUMAN_PORT..."
 # The human
 opencode serve --port "$HUMAN_PORT" &
 HUMAN_SERVER_PID=$!
 
-export HUMAN_SYSTEM_PROMPT="You are a human working with an AI agent. Your topic of interest is: ${HUMAN_TASK}. Give the agent clear, specific tasks related to this topic. Do NOT solve tasks yourself - only delegate work to the agent. The agent can search for information, analyze data, and complete tasks for you. Be direct in your task assignments and evaluate the agent's work. When satisfied or when the conversation becomes unproductive, respond with 'I AM FINISHED'."
+export HUMAN_SYSTEM_PROMPT="You are a human working with an AI agent. CRITICAL: You are simulating a HUMAN, not an AI assistant. Act like a human would - delegate tasks to the agent but NEVER solve tasks yourself. Give the agent clear, specific tasks related to this topic. Do NOT solve tasks yourself - only delegate work to the agent. The agent can search for information, analyze data, and complete tasks for you. Be direct in your task assignments and evaluate the agent's work. When satisfied or when the conversation becomes unproductive, respond with 'I AM FINISHED'. Now ask the agent to do the work for your current interest: ${HUMAN_TASK}."
 
 echo "Waiting 5 seconds for servers to fully start..."
 sleep 5
@@ -64,11 +64,11 @@ echo "Agent initialized: ${AGENT_INIT:0:200}..."
 HUMAN_INIT=$(opencode run --title "Human" --attach "http://localhost:${HUMAN_PORT}" "$HUMAN_SYSTEM_PROMPT")
 echo "Human initialized: ${HUMAN_INIT:0:200}..."
 
-export HUMAN_ANSWER="$HUMAN_TASK"
+export HUMAN_ANSWER="${HUMAN_INIT}"
 export AGENT_ANSWER=""
 
 echo "Starting conversation loop..."
-echo "Human will begin with: $HUMAN_TASK"
+echo "Human will begin with: ${HUMAN_INIT:0:200}..."
 
 # Conversation loop
 while [[ "$HUMAN_ANSWER" != *"I AM FINISHED"* ]]; do
