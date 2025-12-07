@@ -120,3 +120,10 @@ while [[ "$HUMAN_ANSWER" != *"I AM FINISHED"* ]]; do
 done
 
 log_success "Conversation finished"
+
+log_step "Generating summaries"
+AGENT_SUMMARY=$(opencode run -c -s "Agent" --attach "http://localhost:${AGENT_PORT}" "Summarize the result of the conversation out of your perspective")
+log_info "Agent summary: ${AGENT_SUMMARY:0:200}..."
+
+HUMAN_SUMMARY=$(opencode run -c -s "Human" --attach "http://localhost:${HUMAN_PORT}" "Summarize the result of the conversation out of your perspective")
+log_info "Human summary: ${HUMAN_SUMMARY:0:200}..."
