@@ -220,3 +220,6 @@ resources/*
 
 # Browser Automation
 session.json
+
+# User
+.example
