@@ -40,8 +40,10 @@ log_banner
 
 # Define model and configuration
 export MODEL="openai/gpt-4o-mini"
-export MODEL="opencode/big-pickle"
+export MODEL="openai/gpt-5.1"
+export MODEL="openai/gpt-5.1-codex"
 export MODEL="opencode/grok-code"
+export MODEL="opencode/big-pickle"
 
 # Define ports and session titles
 export AGENT_PORT=4096
