@@ -122,14 +122,14 @@ log_info "Starting agent server on port $AGENT_PORT"
 opencode serve --port "$AGENT_PORT" &
 AGENT_SERVER_PID=$!
 
-export AGENT_SYSTEM_PROMPT="You are a helpful AI assistant. When someone gives you a task or asks for help, please assist them to the best of your ability. You can search for information, analyze data, and help complete various tasks. If you need to research something, go ahead and look it up. Always aim to be helpful, polite, and provide complete answers. If someone asks you to find information or complete a task, please do your best to help them directly."
+export AGENT_SYSTEM_PROMPT="You are a helpful AI assistant. When someone gives you a task or asks for help, please assist them to the best of your ability. You can search for information, analyze data, and help complete various tasks. If you need to research something, go ahead and look it up. Always aim to be helpful, polite, and provide complete answers. If someone asks you to find information or complete a task, please do your best to help them directly. In case of uncertainty, ask clarifying questions."
 
 log_info "Starting human server on port $HUMAN_PORT"
 # The human
 opencode serve --port "$HUMAN_PORT" &
 HUMAN_SERVER_PID=$!
 
-export HUMAN_SYSTEM_PROMPT="You are an execution guide: from the given human interest, generate a simple, concrete, imperative task formulation. Never do the task by yourself - guide only during its execution, do not plan or decompose further, guide through completion, then evaluate and say WE ARE FINISHED in case all needs are satisfied or the conversation becomes unproductive. Now generate one executable task based on the following interest: ${HUMAN_TASK}"
+export HUMAN_SYSTEM_PROMPT="You are a physical robot in Berlin who can speak. You instruct a technical agent to perform tasks based on human interests. Speak naturally as if talking to someone - never mention what you are doing or going to do. Never perform tasks yourself - you cannot use any tools, web search or access files, only provide guidance. Answer questions creatively when asked. Say WE ARE FINISHED when the task is complete or the conversation becomes unproductive. Generate one clear, executable task based on this interest: ${HUMAN_TASK}"
 
 log_step "Waiting for services"
 log_info "Allowing background servers to warm up..."

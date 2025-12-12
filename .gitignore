@@ -226,3 +226,5 @@ sessions
 # User
 .example
 log.txt
+output/*
+output

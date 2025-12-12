@@ -1,25 +1,26 @@
 # Agent Conversation Architecture
 
-The `agent_conversation.sh` script spins up two independent OpenCode JSON-RPC services—one for the agent and one for the human advocate—and relays their messages over persistent sessions until the human ends the dialogue.
+The `agent_conversation.sh` script spins up two independent OpenCode JSON-RPC services—one for the agent and one for the human advocate—and relays their messages over persistent sessions until the human ends the dialogue. Both participants have MCPs (Model Context Protocol) configured and at their disposal.
 
 ```
 ╭──────────────────────────────────────────────────────────────╮
 │                🤖 Agent Conversation Flow 🤖                 │
 ╰──────────────────────────────────────────────────────────────╯
 
-      ╭─────────────────╮            ╭─────────────────╮
-      │   🎯 AGENT      │            │   👤 HUMAN      │
-      │                 │            │                 │
-      │ "Helpful AI     │            │ "Planning       │
-      │  Assistant"     │            │  Assistant"     │
-      │                 │            │                 │
-      │ Own context     │            │ Own context     │
-      │                 │            │                 │
-      ╰─────────────────╯            ╰─────────────────╯
+      ╭───────────────────╮            ╭───────────────────╮
+      │     opencode      │            │     opencode      │
+      │                   │            │                   │
+      │   🎯 AGENT        │            │   👤 HUMAN        │
+      │                   │            │                   │
+      │ "Helpful AI       │            │ "Physical Robot"  │
+      │  Assistant"       │            │                   │
+      │                   │            │                   │
+      │ 🔧 MCPs Available │            │ 🔧 MCPs Available │
+      ╰───────────────────╯            ╰───────────────────╯
                ↓                              ↓
-      ┌─────────────────┐            ┌─────────────────┐
-      │   Session ID    │            │   Session ID    │
-      └─────────────────┘            └─────────────────┘
+      ┌───────────────────┐            ┌───────────────────┐
+      │    Session ID     │            │    Session ID     │
+      └───────────────────┘            └───────────────────┘
                ↕                              ↕ 
       ╔═════════════════════════════════════════════════════════╗
       ║                💬 Conversation 💬                       ║
@@ -43,5 +44,6 @@ The `agent_conversation.sh` script spins up two independent OpenCode JSON-RPC se
 
 Key notes:
 - Both services are isolated; each maintains its own session state and system prompt.
+- Both Agent and Human have MCPs (Model Context Protocol) configured and available for tool usage.
 - All dialogue turns are JSON-RPC calls made through `opencode run --attach http://localhost:<PORT>`.
 - Ports are checked and cleared before startup, and sessions are exported after the conversation concludes.
