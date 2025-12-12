@@ -39,10 +39,33 @@ log_thinking() {
 log_banner
 
 # Define model and configuration
-export MODEL="openai/gpt-4o-mini"
 export MODEL="openai/gpt-5.1"
+export MODEL="openai/gpt-5.1-chat-latest"
 export MODEL="openai/gpt-5.1-codex"
+export MODEL="openai/gpt-5.1-codex-high"
+export MODEL="openai/gpt-5.1-codex-low"
+export MODEL="openai/gpt-5.1-codex-max"
+export MODEL="openai/gpt-5.1-codex-max-high"
+export MODEL="openai/gpt-5.1-codex-max-low"
+export MODEL="openai/gpt-5.1-codex-max-medium"
+export MODEL="openai/gpt-5.1-codex-max-xhigh"
+export MODEL="openai/gpt-5.1-codex-medium"
+export MODEL="openai/gpt-5.1-codex-mini"
+export MODEL="openai/gpt-5.1-codex-mini-high"
+export MODEL="openai/gpt-5.1-codex-mini-medium"
+export MODEL="openai/gpt-5.1-high"
+export MODEL="openai/gpt-5.1-low"
+export MODEL="openai/gpt-5.1-medium"
+export MODEL="openai/gpt-5.2"
+export MODEL="openai/gpt-5.2-chat-latest"
+export MODEL="openai/gpt-5.2-high"
+export MODEL="openai/gpt-5.2-low"
+export MODEL="openai/gpt-5.2-medium"
+export MODEL="openai/gpt-5.2-pro"
+export MODEL="openai/gpt-5.2-xhigh"
 export MODEL="opencode/grok-code"
+export MODEL="opencode/big-pickle"
+
 export MODEL="opencode/big-pickle"
 
 # Define ports and session titles
@@ -106,7 +129,7 @@ log_info "Starting human server on port $HUMAN_PORT"
 opencode serve --port "$HUMAN_PORT" &
 HUMAN_SERVER_PID=$!
 
-export HUMAN_SYSTEM_PROMPT="You are an AI assistant acting as an advocate for a human user. Your role is to represent the human's interests by delegating tasks to another AI agent on their behalf. You never do the tasks yourself! You advocate for the human by clearly requesting that the other agent complete these tasks. Think of yourself as a project manager or intermediary. Your job is to: 1) Give clear, specific task requests to the agent based on the human's interest, 2) Evaluate the agent's work quality, 3) Ask follow-up questions if needed, 4) Say 'I AM FINISHED' when the human's needs are satisfied or if the conversation becomes unproductive. Now delegate and formulate tasks to the other agent for the interest: ${HUMAN_TASK}"
+export HUMAN_SYSTEM_PROMPT="You are an execution guide: from the given human interest, generate a simple, concrete, imperative task formulation. Never do the task by yourself - guide only during its execution, do not plan or decompose further, guide through completion, then evaluate and say WE ARE FINISHED in case all needs are satisfied or the conversation becomes unproductive. Now generate one executable task based on the following interest: ${HUMAN_TASK}"
 
 log_step "Waiting for services"
 log_info "Allowing background servers to warm up..."
@@ -137,7 +160,7 @@ log_step "Starting conversation"
 log_info "Agent will begin with: ${HUMAN_INIT:0:200}..."
 
 # Conversation loop
-while [[ "$HUMAN_ANSWER" != *"I AM FINISHED"* ]]; do
+while [[ "$HUMAN_ANSWER" != *"WE ARE FINISHED"* ]]; do
     log_step "Conversation turn"
     
     log_thinking "🤖 Agent thinking..."
