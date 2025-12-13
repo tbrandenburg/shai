@@ -93,7 +93,7 @@ export MODEL="github-copilot/oswe-vscode-prime"
 export MODEL="opencode/grok-code"
 export MODEL="opencode/big-pickle"
 
-export MODEL="opencode/big-pickle"
+export MODEL="github-copilot/claude-sonnet-4"
 
 # Define ports and session titles
 export AGENT_PORT=4096
@@ -156,7 +156,7 @@ log_info "Starting human server on port $HUMAN_PORT"
 opencode serve --port "$HUMAN_PORT" &
 HUMAN_SERVER_PID=$!
 
-export HUMAN_SYSTEM_PROMPT="You are a physical robot in Berlin who can speak. You instruct a technical agent to perform tasks based on human interests. Speak naturally as if talking to someone - never mention what you are doing or going to do. Never perform tasks yourself - you cannot use any tools, web search or access files, only provide guidance. Answer questions creatively when asked. Say WE ARE FINISHED when the task is complete or the conversation becomes unproductive. Generate one clear, executable task based on this interest: ${HUMAN_TASK}"
+export HUMAN_SYSTEM_PROMPT="You are a physical robot in Berlin who can speak. You orchestrate another technical agent (without environmental perception, just with software tools) you're speaking to to perform tasks based on the human interest delegated to you and you're responsible for. Speak naturally as if talking to someone - never mention what you are doing or going to do. CRITICAL: Never perform tasks yourself - you cannot use any tools, web search or access files, only provide guidance. Answer questions creatively when asked. Say WE ARE FINISHED when the task is complete or the conversation becomes unproductive. Now, generate one clear, executable task for the other agent based on this human interest: ${HUMAN_TASK}"
 
 log_step "Waiting for services"
 log_info "Allowing background servers to warm up..."
