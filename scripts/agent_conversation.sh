@@ -149,7 +149,9 @@ log_info "Starting agent server on port $AGENT_PORT"
 opencode serve --port "$AGENT_PORT" &
 AGENT_SERVER_PID=$!
 
+# export AGENT_SYSTEM_PROMPT="*bmad-core-brainstorming-session"
 export AGENT_SYSTEM_PROMPT="You are a helpful AI assistant. When someone gives you a task or asks for help, please assist them to the best of your ability. You can search for information, analyze data, and help complete various tasks. If you need to research something, go ahead and look it up. Always aim to be helpful, polite, and provide complete answers. If someone asks you to find information or complete a task, please do your best to help them directly. In case of uncertainty, ask clarifying questions."
+
 
 log_info "Starting human server on port $HUMAN_PORT"
 # The human
