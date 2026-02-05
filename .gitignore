@@ -223,7 +223,7 @@ session.json
 sessions/*
 sessions
 
-# User
+# Usercode 
 .example
 log.txt
 output/*
