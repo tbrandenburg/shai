@@ -31,7 +31,20 @@ transparent and reproducible.
 - 💬 Works with any LLM CLI
 - 🤖 **GitHub Actions integration** for automated issue processing
 
-## ✨ Why This Project Matters
+## ✨ Unified SHAI CLI (Next Evolution)
+
+To make SHAI even easier to use and remember for daily command-line tasks, we're introducing a unified `shai` command-line interface. This wrapper script simplifies pipeline execution by handling script paths, ID generation, and consistent input parsing.
+
+Now, instead of remembering specific script locations and argument formats, you can run any SHAI pipeline with a single, clear command:
+
+```bash
+shai &lt;pipeline_type&gt; &lt;prompt_text | --file &lt;path&gt;&gt; [--id &lt;identifier&gt;]
+```
+
+### 🚀 Key Benefits
+
+-   **Single Entry Point:** One command to rule them all: `shai`.
+-   **Intuitive
 
 Running agents with shell scripts unlocks powerful capabilities:
 
@@ -91,6 +104,14 @@ Call it via:
 
 ```bash
 ./scripts/pipeline_essay.sh "Scouts in Sweden"
+```
+
+```bash
+shai essay "Scouts in Sweden"
+# Or with a custom ID:
+shai essay "Scouts in Sweden" --id sweden-scouts-report
+# Or with file input:
+shai essay --file sweden_scouts_topic.txt --id sweden-scouts-file
 ```
 
 Each agent:
